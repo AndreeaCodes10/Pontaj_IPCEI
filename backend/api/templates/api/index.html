@@ -1,0 +1,152 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pontaj App</title>
+    <script src="{% static 'api/labs.js' %}"></script>
+    <script src="{% static 'api/calendar.js' %}"></script>
+    <script src="{% static 'api/form.js' %}"></script>
+    <script src="{% static 'api/auth.js' %}"></script>
+    <script src="{% static 'api/export.js' %}"></script>
+    <script src="{% static 'api/app.js' %}"></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+
+<header class="topbar">
+    <h1 class="app-title">Pontaj App</h1>
+
+    <div id="authArea" class="auth-area">
+        <!-- filled by JS -->
+    </div>
+</header>
+
+<div class="layout">
+    <aside class="sidebar">
+        <h3>Statistici lunare</h3>
+
+        <div class="stat-box">
+            <p>Ore lucrate:</p>
+            <strong><span id="usedHours">0</span> h</strong>
+        </div>
+
+        <div class="stat-box">
+            <p>Limită lunară:</p>
+            <strong><span id="limitHours">0</span> h</strong>
+        </div>
+
+        <div class="stat-box">
+            <p>Rămase:</p>
+            <strong><span id="remainingHours">0</span> h</strong>
+        </div>
+
+        <div class="progress-container">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="userEntries" class="sidebar-entries"></div>
+    </aside>
+
+    <main class="main-content">
+    <div class="card">
+        <h2>Adaugă activitate</h2>
+
+        <form id="workEntryForm">
+
+            <div class="form-group">
+                <label for="lab">Lab</label>
+                <select id="lab"></select>
+            </div>
+
+            <div class="form-group">
+                <label for="subactivitate">Subactivitate</label>
+                <select id="subactivitate"></select>
+            </div>
+
+            <div class="form-group">
+                <label for="livrabil">Livrabil</label>
+                <select id="livrabil">
+                    <option value="cod">Cod</option>
+                    <option value="raport">Raport</option>
+                    <option value="prezentare">Prezentare</option>
+                    <option value="documentatie">Documentație</option>
+                    <option value="altul">Altul</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="individual">Individual</label>
+                <select id="individual">
+                    <option value="false">Nu</option>
+                    <option value="true">Da</option>
+                </select>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="date">Date</label>
+                    <input type="text" id="date">
+                </div>
+
+                <div class="form-group">
+                    <label for="start_time">Start Time</label>
+                    <input type="text" id="start_time" step="3600">
+                </div>
+
+                <div class="form-group">
+                    <label>Nr. ore</label>
+                    <input type="number" id="nr_ore" min="1" step="1" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="activity_description">Activity Description</label>
+                <input type="text" id="activity_description" placeholder="Descriere activitate...">
+            </div>
+            <div class="form-group">
+                <label for="links">Links</label>
+                <textarea id="links" placeholder="GitHub, Drive, etc."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="comentarii">Comentarii</label>
+                <textarea id="comentarii" placeholder="Observații..."></textarea>
+            </div>
+        <input type="hidden" id="total_hours">
+        <div class="actions">
+            <button type="submit" form="workEntryForm" class="btn-primary">Salvează</button>
+            <input type="month" id="exportMonth">
+            <button type="button" id="exportBtn" class="btn-secondary" style="display:none;">Export Excel</button>
+        </div>
+    
+    </form>
+    </div>
+    </main>
+    <aside class="sidebar-right" id="labMembersPanel">
+        <h3 class="sidebar-title">Active Members</h3>
+
+        <div id="labMembersList" class="members-list"></div>
+
+        <div id="addMemberSection" class="add-member-section">
+            <select id="addUserSelect"></select>
+            <button id="addUserBtn">Add to Lab</button>
+        </div>
+    </aside>
+</div>
+
+<footer>
+    © 2026 Pontaj App · Built for lab tracking in IPCEI project
+</footer>
+
+<script src="{% static 'api/app.js' %}"></script>
+<!-- Future Firebase scripts -->
+</body>
+</html>
