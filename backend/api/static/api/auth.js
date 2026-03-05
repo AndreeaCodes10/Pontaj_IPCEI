@@ -22,7 +22,7 @@ const Auth = {
 
     loadAuthArea(labId = null) {
         let url = "/api/current-user/";
-        if (labId) url += `?lab_id=${labId}`;
+        if (labId) url += `?lab=${labId}`;
 
         fetch(url)
             .then(res => res.json())

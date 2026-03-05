@@ -47,7 +47,7 @@ def logout_view(request):
 
 @login_required
 def get_pontaj_dates(request):
-    lab_id = request.GET.get("lab_id")
+    lab_id = request.GET.get("lab")
 
     entries = WorkEntry.objects.filter(
         user=request.user,
@@ -173,10 +173,15 @@ def create_work_entry(request):
 
         user = request.user
         profile = user.userprofile
-        lab_id = data.get("lab_id")
+        lab_id = data.get("lab")
 
         nr_ore = data.get("nr_ore")
         durata = data.get("durata")
+        if not lab_id:
+            return JsonResponse({"error": "Missing lab"}, status=400)
+
+        if not data.get("nr_ore") or not data.get("durata"):
+            return JsonResponse({"error": "Missing nr_ore or durata"}, status=400)
         
         if not data.get("nr_ore") or not data.get("durata"):
             return JsonResponse({"error": "Missing nr_ore or durata"}, status=400)
@@ -184,6 +189,12 @@ def create_work_entry(request):
         membership = LabMembership.objects.get(
             profile=profile,
             lab_id=lab_id
+        )
+
+        if not membership:
+            return JsonResponse(
+            {"error": "User not enrolled in this lab"},
+            status=403
         )
 
         date_obj = datetime.strptime(data["date"], "%Y-%m-%d")
@@ -222,7 +233,7 @@ def create_work_entry(request):
 def monthly_user_entries(request):
     month = int(request.GET.get("month"))
     year = int(request.GET.get("year"))
-    lab_id = request.GET.get("lab_id")
+    lab_id = request.GET.get("lab")
 
     entries = WorkEntry.objects.filter(
         user=request.user,

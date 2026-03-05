@@ -26,7 +26,7 @@ const Export = {
                 const labId = document.getElementById("lab").value;
 
                 window.location.href =
-                `/api/export-monthly-sheet/?lab_id=${labId}&month=${month}&year=${year}`;
+                `/api/export-monthly-sheet/?lab=${labId}&month=${month}&year=${year}`;
             });
 
         } else {

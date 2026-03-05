@@ -166,8 +166,9 @@ def export_monthly_sheet(request):
                 pass
         if column == "A":
             print("max len",max_length)
-            ws.column_dimensions[column].width = max_length + 225
-        ws.column_dimensions[column].width = max_length
+            ws.column_dimensions[column].width = max_length - 5
+        else:
+            ws.column_dimensions[column].width = max_length
 
     
     ws.cell(row=row, column=1, value="Director/Responsabil Proiect Cercetare")

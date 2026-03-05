@@ -27,6 +27,8 @@ const Labs = {
     attachEvents() {
         this.labSelect.addEventListener("change", async (e) => {
             const labId = e.target.value;
+            window.currentLabId = labId;
+            
             if (labId) {
                 loadLabMembers(labId);
                 loadAllUsers(labId);
@@ -58,7 +60,7 @@ const Labs = {
             const option = document.createElement("option");
             option.value = sub.id;
             option.textContent = sub.nume;
-            option.dataset.livrabil = sub.display_livrabil;
+            option.dataset.livrabil = sub.livrabil;
             option.dataset.individual = sub.individual;
             this.subSelect.appendChild(option);
         });
@@ -122,6 +124,7 @@ async function loadAllUsers(labId) {
 
     const select = document.getElementById("addUserSelect");
     const btn = document.getElementById("addUserBtn");
+    if (!select || !btn) return;
 
     select.innerHTML = users
         .map(u => `<option value="${u.id}">${u.username}</option>`)

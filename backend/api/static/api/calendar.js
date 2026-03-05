@@ -4,14 +4,14 @@ const Calendar = {
 
     init() {
         this.initializeTimePickers();
-        this.loadMonthlyHours();
-        const now = new Date();
-        loadUserEntries(now.getMonth() + 1, now.getFullYear());
-        loadUsers();
+        // this.loadMonthlyHours();
+        // const now = new Date();
+        // loadUserEntries(now.getMonth() + 1, now.getFullYear());
+        // loadUsers();
     },
 
     async loadCalendarForLab(labId) {
-        const response = await fetch(`/api/pontaj-dates/?lab_id=${labId}`);
+        const response = await fetch(`/api/pontaj-dates/?lab=${labId}`);
         const workedDates = await response.json();
 
         if (this.datePickerInstance) {
@@ -68,7 +68,7 @@ const Calendar = {
         month = month || now.getMonth() + 1;
         year = year || now.getFullYear();
 
-        fetch(`/api/monthly-hours/?lab_id=${window.currentLabId}&month=${month}&year=${year}`)
+        fetch(`/api/monthly-hours/?lab=${window.currentLabId}&month=${month}&year=${year}`)
             .then(res => res.json())
             .then(data => {
                 document.getElementById("usedHours").innerText = data.used_hours;
@@ -95,7 +95,7 @@ async function loadUsers() {
 }
 
 async function loadUserEntries(month, year) {
-    const res = await fetch(`/api/monthly-user-entries/?month=${month}&year=${year}`);
+    const res = await fetch(`/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`);
     const entries = await res.json();
 
     const container = document.getElementById("userEntries");
