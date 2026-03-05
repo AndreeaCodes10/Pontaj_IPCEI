@@ -1,3 +1,17 @@
+'''
+Views related to user and lab management, such as listing lab members, adding/removing users from labs, and listing all users.
+
+FUNCTIONS:
+----------
+lab_members(request, lab_id): 
+    Lists members of a lab. Accessible by admin and lab members.
+add_user_to_lab(request, lab_id, user_id): 
+    Adds a user to a lab. Accessible by admin and lab directors.
+remove_user_from_lab(request, lab_id, user_id): 
+    Removes a user from a lab. Accessible by admin and lab directors.
+all_users(request): 
+    Lists all users. Accessible by admin and lab directors.
+'''
 import json
 from django.http import JsonResponse, HttpResponseForbidden 
 from django.shortcuts import get_object_or_404

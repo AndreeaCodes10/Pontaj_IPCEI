@@ -6,7 +6,7 @@ const Export = {
     },
 
     applyPermissions(user) {
-        const canExport = user.is_director || user.global_role === "admin";
+        const canExport = user.lab_role === "director" || user.global_role === "admin";
 
         if (!this.exportBtn || !this.exportMonth) return;
 
@@ -26,7 +26,7 @@ const Export = {
                 const labId = document.getElementById("lab").value;
 
                 window.location.href =
-                `/api/export-monthly-sheet/?lab=${labId}&month=${month}&year=${year}`;
+                `/api/export-monthly-sheet/?lab_id=${labId}&month=${month}&year=${year}`;
             });
 
         } else {

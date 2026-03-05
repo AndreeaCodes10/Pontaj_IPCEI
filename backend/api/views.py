@@ -109,35 +109,59 @@ def get_monthly_hours(request):
 #         })
 #     return JsonResponse({"username": None})
 
+# @login_required
+# def current_user(request):
+#     '''Endpoint to get current user info, including global role and lab-specific role if lab_id is provided.'''
+#     user = request.user
+#     profile = user.userprofile
+
+#     lab_id = request.GET.get("lab_id")
+
+#     lab_role = None
+#     is_director = False
+
+#     if lab_id:
+#         membership = LabMembership.objects.filter(
+#             profile=profile,
+#             lab_id=lab_id
+#         ).first()
+
+#         if membership:
+#             lab_role = membership.role
+#             is_director = membership.role == "director"
+
+#     data = {
+#         "username": user.username,
+#         "global_role": profile.role,  # admin or not
+#         "lab_role": lab_role,
+#         "is_director": is_director,
+#     }
+
+#     return JsonResponse(data)
+
 @login_required
 def current_user(request):
-    '''Endpoint to get current user info, including global role and lab-specific role if lab_id is provided.'''
-    user = request.user
-    profile = user.userprofile
-
-    lab_id = request.GET.get("lab_id")
+    profile = request.user.userprofile
+    lab_id = request.GET.get("lab")
 
     lab_role = None
-    is_director = False
 
     if lab_id:
-        membership = LabMembership.objects.filter(
-            profile=profile,
-            lab_id=lab_id
-        ).first()
-
-        if membership:
+        try:
+            membership = LabMembership.objects.get(
+                lab_id=lab_id,
+                profile=profile
+            )
             lab_role = membership.role
-            is_director = membership.role == "director"
+        except LabMembership.DoesNotExist:
+            pass
 
-    data = {
-        "username": user.username,
-        "global_role": profile.role,  # admin or not
-        "lab_role": lab_role,
-        "is_director": is_director,
-    }
+    return JsonResponse({
+        "username": request.user.username,
+        "global_role": profile.role,
+        "lab_role": lab_role
+    })
 
-    return JsonResponse(data)
 
 @login_required
 def index(request):
@@ -205,11 +229,11 @@ def create_work_entry(request):
             lab_id=lab_id
         ).first()
 
-        if not membership:
+        if not membership and profile.role != "admin":
             return JsonResponse(
-            {"error": "User not enrolled in this lab"},
-            status=403
-        )
+                {"error": "User not enrolled in this lab"},
+                status=403
+            )
 
         date_obj = datetime.strptime(data["date"], "%Y-%m-%d")
         month = date_obj.month

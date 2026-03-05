@@ -142,7 +142,7 @@ async function loadAllUsers(labId) {
         loadLabMembers(labId);
     };
 }
-
+// nu imi e clar de ce exista
 async function loadUsers() {
     const res = await fetch("/api/users/");
     const users = await res.json();
