@@ -50,6 +50,9 @@ const Calendar = {
                 }
             }
         });
+        const now = new Date();
+        this.loadMonthlyHours(now.getMonth() + 1, now.getFullYear());
+        loadUserEntries(now.getMonth() + 1, now.getFullYear());
     },
 
     initializeTimePickers() {
@@ -71,6 +74,11 @@ const Calendar = {
         fetch(`/api/monthly-hours/?lab=${window.currentLabId}&month=${month}&year=${year}`)
             .then(res => res.json())
             .then(data => {
+                console.log("monthly-hours response:", data);
+                if (!data || data.used_hours === undefined) {
+                    console.error("Invalid monthly-hours response:", data);
+                    return;
+                }
                 document.getElementById("usedHours").innerText = data.used_hours;
                 document.getElementById("limitHours").innerText = data.limit;
                 document.getElementById("remainingHours").innerText = data.remaining;

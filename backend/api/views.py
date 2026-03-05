@@ -67,12 +67,21 @@ def get_monthly_hours(request):
     month = int(request.GET.get("month", datetime.now().month))
     year = int(request.GET.get("year", datetime.now().year))
 
-    lab_id = request.GET.get("lab_id")
+    lab_id = request.GET.get("lab")
+    if not lab_id:
+        return JsonResponse({"error": "lab_id required"}, status=400)
 
-    membership = LabMembership.objects.get(
+    membership = LabMembership.objects.filter(
         profile=request.user.userprofile,
         lab_id=lab_id
-    )
+    ).first()
+
+    if not membership:
+        return JsonResponse({
+            "used_hours": 0,
+            "limit": 0, 
+            "remaining": 0
+        })
 
     total = WorkEntry.objects.filter(
         user=request.user,
@@ -186,10 +195,10 @@ def create_work_entry(request):
         if not data.get("nr_ore") or not data.get("durata"):
             return JsonResponse({"error": "Missing nr_ore or durata"}, status=400)
         
-        membership = LabMembership.objects.get(
+        membership = LabMembership.objects.filter(
             profile=profile,
             lab_id=lab_id
-        )
+        ).first()
 
         if not membership:
             return JsonResponse(
