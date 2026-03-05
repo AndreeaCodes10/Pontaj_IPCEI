@@ -7,6 +7,7 @@ from .models import Lab, User, LabMembership
 
 @login_required
 def lab_members(request, lab_id):
+    '''Endpoint to list active members of a lab. Only admin or lab members can access this endpoint.'''
     lab = get_object_or_404(Lab, id=lab_id)
 
     profile = request.user.userprofile
@@ -33,6 +34,7 @@ def lab_members(request, lab_id):
 @login_required
 @require_http_methods(["POST"])
 def add_user_to_lab(request, lab_id, user_id):
+    '''Endpoint to add a user to a lab. Only admin or lab director can perform this action.'''
     lab = get_object_or_404(Lab, id=lab_id)
     user = get_object_or_404(User, id=user_id)
 
@@ -54,6 +56,7 @@ def add_user_to_lab(request, lab_id, user_id):
 @login_required
 @require_http_methods(["DELETE"])
 def remove_user_from_lab(request, lab_id, user_id):
+    '''Endpoint to remove a user from a lab. Only admin or lab director can perform this action.'''
     lab = get_object_or_404(Lab, id=lab_id)
     target_user = get_object_or_404(User, id=user_id)
 
@@ -89,6 +92,7 @@ def remove_user_from_lab(request, lab_id, user_id):
 
 @login_required
 def all_users(request):
+    '''Endpoint to list all users, for admin and director use only'''
     profile = request.user.userprofile
 
     if profile.role == "admin":

@@ -9,6 +9,7 @@ from .models import Lab, LabMembership, User, WorkEntry
 
 @require_http_methods(["GET"])
 def export_monthly_sheet(request):
+    '''Endpoint to export an Excel sheet with the monthly work entries for all users in a lab. Only accessible by admin or lab director.'''
 
     if not request.user.is_authenticated:
         return HttpResponseForbidden()

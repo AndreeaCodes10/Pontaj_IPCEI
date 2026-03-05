@@ -53,6 +53,7 @@ const Calendar = {
         const now = new Date();
         this.loadMonthlyHours(now.getMonth() + 1, now.getFullYear());
         loadUserEntries(now.getMonth() + 1, now.getFullYear());
+        
     },
 
     initializeTimePickers() {
@@ -90,17 +91,6 @@ const Calendar = {
 
 };
 
-async function loadUsers() {
-    const res = await fetch("/api/users/");
-    const users = await res.json();
-
-    const select = document.getElementById("userSelect");
-    select.innerHTML = '<option value="">Select user</option>';
-
-    users.forEach(u => {
-        select.innerHTML += `<option value="${u.id}">${u.username}</option>`;
-    });
-}
 
 async function loadUserEntries(month, year) {
     const res = await fetch(`/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`);

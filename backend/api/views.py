@@ -47,6 +47,7 @@ def logout_view(request):
 
 @login_required
 def get_pontaj_dates(request):
+    '''Endpoint to get all dates where the user has work entries, for a given lab.'''
     lab_id = request.GET.get("lab")
 
     entries = WorkEntry.objects.filter(
@@ -62,6 +63,7 @@ def get_pontaj_dates(request):
 
 @login_required
 def get_monthly_hours(request):
+    '''Endpoint to get total hours worked by the user in a given month/year and lab, along with the monthly limit.'''
     user = request.user
     # read month/year from query params, default to current
     month = int(request.GET.get("month", datetime.now().month))
@@ -109,6 +111,7 @@ def get_monthly_hours(request):
 
 @login_required
 def current_user(request):
+    '''Endpoint to get current user info, including global role and lab-specific role if lab_id is provided.'''
     user = request.user
     profile = user.userprofile
 
@@ -141,6 +144,7 @@ def index(request):
     return render(request, "api/index.html")
 
 def get_visible_labs(user):
+    '''Helper function to get labs visible to the user based on their role. Admin sees all, director sees their labs, member sees their labs.'''
     profile = user.userprofile
 
     if profile.role == "admin":
@@ -176,6 +180,7 @@ def list_subactivitati(request, lab_id):
 
 @require_http_methods(["POST"])
 def create_work_entry(request):
+    '''Endpoint to create a work entry. Validates that the user is enrolled in the lab and does not exceed monthly hour limit.'''
     if request.method == "POST":
         data = json.loads(request.body)
         print("RECEIVED:", data)
@@ -240,6 +245,7 @@ def create_work_entry(request):
 
 @login_required
 def monthly_user_entries(request):
+    '''Endpoint to get all work entries for the current user in a given month/year and lab.'''
     month = int(request.GET.get("month"))
     year = int(request.GET.get("year"))
     lab_id = request.GET.get("lab")
@@ -271,6 +277,7 @@ def monthly_user_entries(request):
 @login_required
 @require_http_methods(["DELETE"])
 def delete_work_entry(request, entry_id):
+    '''Endpoint to delete a work entry. Only the user who created the entry can delete it.'''
     entry = get_object_or_404(WorkEntry, id=entry_id, user=request.user)
     entry.delete()
     return JsonResponse({"status": "ok"})

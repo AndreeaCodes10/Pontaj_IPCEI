@@ -142,3 +142,15 @@ async function loadAllUsers(labId) {
         loadLabMembers(labId);
     };
 }
+
+async function loadUsers() {
+    const res = await fetch("/api/users/");
+    const users = await res.json();
+
+    const select = document.getElementById("userSelect");
+    select.innerHTML = '<option value="">Select user</option>';
+
+    users.forEach(u => {
+        select.innerHTML += `<option value="${u.id}">${u.username}</option>`;
+    });
+}
