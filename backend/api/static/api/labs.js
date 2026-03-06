@@ -28,14 +28,15 @@ const Labs = {
         this.labSelect.addEventListener("change", async (e) => {
             const labId = e.target.value;
             window.currentLabId = labId;
-            
-            if (labId) {
+            if (!labId) return;
+            const user = await Auth.getCurrentUser(labId);
+            applyLabPermissions(user);
+
+            if (user.global_role === "admin" || user.lab_role === "director") {
                 loadLabMembers(labId);
                 loadAllUsers(labId);
-                Auth.loadAuthArea(labId); 
             }
-            if (!labId) return;
-
+            Auth.loadAuthArea(labId); 
             await this.loadSubactivitati(labId);
             Calendar.loadCalendarForLab(labId);
         });
@@ -67,7 +68,20 @@ const Labs = {
     }
 };
 
-async function loadLabMembers(labId) {
+function applyLabPermissions(user) {
+    const sidebar = document.getElementById("labMembersPanel");
+
+    const isAdmin = user.global_role === "admin";
+    const isDirector = user.lab_role === "director";
+
+    if (isAdmin || isDirector) {
+        sidebar.style.display = "block";
+    } else {
+        sidebar.style.display = "none";
+    }
+}
+
+/*async function loadLabMembers(labId) {
     const res = await fetch(`/api/labs/${labId}/members/`);
     const members = await res.json();
 
@@ -83,6 +97,53 @@ async function loadLabMembers(labId) {
     list.querySelectorAll(".remove-member").forEach(btn => {
         btn.addEventListener("click", async () => {
             const uid = btn.dataset.id;
+            if (!confirm("Ștergi acest utilizator?")) return;
+
+            await fetch(`/api/labs/${labId}/remove/${uid}/`, {
+                method: "DELETE",
+                headers: { "X-CSRFToken": getCSRFToken() },
+                credentials: "same-origin"
+            });
+
+            loadLabMembers(labId);
+        });
+    });
+}*/
+
+async function loadLabMembers(labId) {
+    const res = await fetch(`/api/labs/${labId}/members/`);
+    const members = await res.json();
+
+    const user = await Auth.getCurrentUser(labId);
+
+    const list = document.getElementById("labMembersList");
+
+    list.innerHTML = members.map(m => {
+
+        const isAdmin = user.global_role === "admin";
+        const isDirector = user.lab_role === "director";
+
+        const canRemove =
+            isAdmin ||
+            (isDirector && m.username !== user.username);
+
+        return `
+            <div class="member-row">
+                <span>${m.username}</span>
+                ${
+                    canRemove
+                        ? `<button class="remove-member" data-id="${m.id}">✖</button>`
+                        : ""
+                }
+            </div>
+        `;
+    }).join("");
+
+    list.querySelectorAll(".remove-member").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const uid = btn.dataset.id;
+
+            if (!confirm("Ștergi acest utilizator?")) return;
 
             await fetch(`/api/labs/${labId}/remove/${uid}/`, {
                 method: "DELETE",

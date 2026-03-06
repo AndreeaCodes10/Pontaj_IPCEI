@@ -70,39 +70,56 @@ def add_user_to_lab(request, lab_id, user_id):
 @login_required
 @require_http_methods(["DELETE"])
 def remove_user_from_lab(request, lab_id, user_id):
-    '''Endpoint to remove a user from a lab. Only admin or lab director can perform this action.'''
+    """Remove a user from a lab.
+    Admins can remove anyone.
+    Directors can remove anyone except themselves.
+    """
+
     lab = get_object_or_404(Lab, id=lab_id)
     target_user = get_object_or_404(User, id=user_id)
 
-    requester = request.user.userprofile
+    requester_profile = request.user.userprofile
+    target_profile = target_user.userprofile
+    # Admin can remove anyone without membership check
+    if requester_profile.role == "admin":
+        LabMembership.objects.filter(
+            lab=lab,
+            profile=target_profile
+        ).delete()
+
+        return JsonResponse({"status": "ok"})
 
     try:
         requester_membership = LabMembership.objects.get(
-            lab=lab, profile=requester
+            lab=lab, profile=requester_profile
         )
     except LabMembership.DoesNotExist:
         return HttpResponseForbidden()
 
     try:
         target_membership = LabMembership.objects.get(
-            lab=lab, profile=target_user.userprofile
+            lab=lab, profile=target_profile
         )
     except LabMembership.DoesNotExist:
         return JsonResponse({"status": "not_member"})
 
-    # admin can remove anyone
-    if requester.role != "admin":
-        if requester_membership.role != "director":
-            return HttpResponseForbidden()
+    # Admin can remove anyone
+    if requester_profile.role == "admin":
+        target_membership.delete()
+        return JsonResponse({"status": "ok"})
 
+    # Director permissions
+    if requester_membership.role == "director":
         if target_user == request.user:
-            return HttpResponseForbidden()
+            return JsonResponse(
+                {"status": "error", "message": "Director cannot remove themselves"},
+                status=403
+            )
 
-        if target_membership.role == "director":
-            return HttpResponseForbidden()
+        target_membership.delete()
+        return JsonResponse({"status": "ok"})
 
-    target_membership.delete()
-    return JsonResponse({"status": "ok"})
+    return HttpResponseForbidden()
 
 @login_required
 def all_users(request):

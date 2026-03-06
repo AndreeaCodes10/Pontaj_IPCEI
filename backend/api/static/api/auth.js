@@ -19,6 +19,14 @@ const Auth = {
             window.location.href = "/api/login/";
         });
     },
+    
+    async getCurrentUser(labId = null) {
+        let url = "/api/current-user/";
+        if (labId) url += `?lab=${labId}`;
+
+        const res = await fetch(url);
+        return await res.json();
+    },
 
     loadAuthArea(labId = null) {
         let url = "/api/current-user/";
