@@ -15,7 +15,8 @@ urlpatterns = [
     path('login/', views.login_page, name="login"),
     path("current-user/", views.current_user, name="current-user"),
     path("logout/", views.logout_view, name="logout"),
-    path("export-monthly-sheet/", export_views.export_monthly_sheet, name="export-monthly-sheet"),
+    # path("export-monthly-sheet/", export_views.export_monthly_sheet, name="export-monthly-sheet"),
+    path("export-monthly-sheet/", export_views.export_work_entries_excel, name="export-work-entries-excel"),
     path("monthly-user-entries/", views.monthly_user_entries, name="monthly-user-entries"),
     path("work-entry/<int:entry_id>/", views.delete_work_entry, name="delete-work-entry"),
 

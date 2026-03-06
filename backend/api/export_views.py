@@ -5,6 +5,196 @@ from django.views.decorators.http import require_http_methods
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from .models import Lab, LabMembership, User, WorkEntry
+import zipfile
+from io import BytesIO
+
+# -----------------------
+# EXPORT TO EXCEL - OLD ENDPOINT (REPLACED BY MONTHLY SHEET EXPORT)
+# -----------------------
+# @require_http_methods(["GET"])
+# def export_work_entries_excel(request):
+
+#     if not request.user.is_authenticated:
+#         return HttpResponseForbidden()
+
+#     try:
+#         role = request.user.userprofile.role
+#     except UserProfile.DoesNotExist:
+#         return HttpResponseForbidden()
+
+#     if role not in ["prof", "admin"]:
+#         return HttpResponseForbidden()
+    
+#     wb = Workbook()
+#     ws = wb.active
+#     ws.title = "Pontaj"
+
+#     ws.append([
+#         "User",
+#         "Lab",
+#         "Subactivitate",
+#         "Livrabil",
+#         "Individual",
+#         "Data",
+#         "Nr ore",
+#         "Durata",
+#         "Descriere activitate",
+#         "Comentarii",
+#         "Links",
+#     ])
+
+#     for e in WorkEntry.objects.select_related(
+#         "user", "lab", "subactivitate"
+#     ):
+        
+#         ws.append([
+#             e.user.username if e.user else "Anonymous",
+#             e.lab.name,
+#             e.subactivitate.nume,
+#             e.subactivitate.livrabil,
+#             "Da" if e.individual else "Nu",
+#             e.date.strftime("%d-%m-%Y"),
+#             e.nr_ore,
+#             e.durata,
+#             e.activity_description,
+#             e.comentarii,
+#             e.links,
+#         ])
+
+#     # Make columns auto width
+#     for col in ws.columns:
+#         max_length = 0
+#         column = col[0].column_letter
+#         for cell in col:
+#             try:
+#                 max_length = max(max_length, len(str(cell.value)))
+#             except:
+#                 pass
+#         ws.column_dimensions[column].width = max_length + 2
+        
+#     response = HttpResponse(
+#         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+#     )
+#     response["Content-Disposition"] = 'attachment; filename="pontaj.xlsx"'
+#     wb.save(response)
+#     return response
+
+@require_http_methods(["GET"])
+def export_work_entries_excel(request):
+
+    if not request.user.is_authenticated:
+        return HttpResponseForbidden()
+    lab_id = request.GET.get("lab_id")
+    lab = get_object_or_404(Lab, id=lab_id)
+    profile = request.user.userprofile
+    
+    is_admin = profile.role == "admin"
+
+    is_director = LabMembership.objects.filter(
+       lab=lab,
+        profile=profile,
+        role="director"
+    ).exists()
+
+    if not (is_admin or is_director):
+        return HttpResponseForbidden()
+
+    # ---------------------------
+    # PARAMETERS (same as monthly)
+    # ---------------------------
+    
+    month = int(request.GET.get("month"))
+    year = int(request.GET.get("year"))
+
+    lab = get_object_or_404(Lab, id=lab_id)
+
+    # ---------------------------
+    # FILE 1: OLD EXPORT FORMAT
+    # ---------------------------
+    wb_old = Workbook()
+    ws_old = wb_old.active
+    ws_old.title = "Pontaj"
+
+    ws_old.append([
+        "User",
+        "Lab",
+        "Subactivitate",
+        "Livrabil",
+        "Individual",
+        "Data",
+        "Nr ore",
+        "Durata",
+        "Descriere activitate",
+        "Comentarii",
+        "Links",
+    ])
+
+    entries = WorkEntry.objects.select_related(
+        "user", "lab", "subactivitate"
+    ).filter(
+        lab=lab,
+        date__year=year,
+        date__month=month
+    )
+
+    for e in entries:
+        ws_old.append([
+            e.user.username if e.user else "Anonymous",
+            e.lab.name,
+            e.subactivitate.nume,
+            e.subactivitate.livrabil,
+            "Da" if e.individual else "Nu",
+            e.date.strftime("%d-%m-%Y"),
+            e.nr_ore,
+            e.durata,
+            e.activity_description,
+            e.comentarii,
+            e.links,
+        ])
+
+    for col in ws_old.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                max_length = max(max_length, len(str(cell.value)))
+            except:
+                pass
+        ws_old.column_dimensions[column].width = max_length + 2
+
+    old_file = BytesIO()
+    wb_old.save(old_file)
+    old_file.seek(0)
+
+    # ---------------------------
+    # FILE 2: MONTHLY SHEET
+    # ---------------------------
+    # reuse the same endpoint internally
+    monthly_response = export_monthly_sheet(request)
+
+    monthly_file = BytesIO(monthly_response.content)
+
+    # ---------------------------
+    # ZIP FILE
+    # ---------------------------
+    zip_buffer = BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, "w") as z:
+        z.writestr("pontaj_entries.xlsx", old_file.getvalue())
+        z.writestr(f"pontaj_{lab.name}_{month}_{year}.xlsx", monthly_file.getvalue())
+
+    zip_buffer.seek(0)
+
+    response = HttpResponse(
+        zip_buffer,
+        content_type="application/zip"
+    )
+
+    response["Content-Disposition"] = (
+        f'attachment; filename="pontaj_{lab.name}_{month}_{year}.zip"'
+    )
+
+    return response
 
 
 @require_http_methods(["GET"])
