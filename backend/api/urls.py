@@ -6,6 +6,7 @@ from . import export_views
 
 urlpatterns = [
     path("app/", views.index, name="index"),
+    path("entries/", views.entries_page, name="entries_page"),
     path("labs/", views.list_labs, name="list-labs"),
     path("subactivitati/<int:lab_id>/", views.list_subactivitati, name="list-subactivitati"),
     path("work-entry/", views.create_work_entry, name="create-work-entry"),
@@ -16,7 +17,8 @@ urlpatterns = [
     path("current-user/", views.current_user, name="current-user"),
     path("logout/", views.logout_view, name="logout"),
     # path("export-monthly-sheet/", export_views.export_monthly_sheet, name="export-monthly-sheet"),
-    path("export-monthly-sheet/", export_views.export_work_entries_excel, name="export-work-entries-excel"),
+    path("export-monthly-sheet/", export_views.export_excel, name="export-excel"),
+    # path("export-monthly-sheet/", export_views.export_work_entries_excel, name="export-work-entries-excel"),
     path("monthly-user-entries/", views.monthly_user_entries, name="monthly-user-entries"),
     path("work-entry/<int:entry_id>/", views.delete_work_entry, name="delete-work-entry"),
 
@@ -24,4 +26,5 @@ urlpatterns = [
     path("labs/<int:lab_id>/add/<int:user_id>/", users_views.add_user_to_lab),
     path("labs/<int:lab_id>/remove/<int:user_id>/", users_views.remove_user_from_lab),
     path("all-users/", users_views.all_users, name="all-users"),
+
 ]

@@ -91,7 +91,6 @@ const Calendar = {
 
 };
 
-
 async function loadUserEntries(month, year) {
     const res = await fetch(`/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`);
     const entries = await res.json();

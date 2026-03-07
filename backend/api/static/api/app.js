@@ -10,6 +10,22 @@ const App = {
 
 document.addEventListener("DOMContentLoaded", () => {
     App.init();
+    document.getElementById("openEntriesPage")?.addEventListener("click", () => {
+
+    const lab = document.getElementById("lab")?.value;
+    const date = document.getElementById("date")?.value;
+
+    let month = new Date().getMonth() + 1;
+    let year = new Date().getFullYear();
+
+    if (date) {
+        const parts = date.split("-");
+        month = parts[1];
+        year = parts[2];
+    }
+
+    window.location.href = `/api/entries/?lab=${lab}&month=${month}&year=${year}`;
+    });
 });
 
 // document.addEventListener("DOMContentLoaded", () => {

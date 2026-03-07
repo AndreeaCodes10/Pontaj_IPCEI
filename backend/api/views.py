@@ -167,6 +167,10 @@ def current_user(request):
 def index(request):
     return render(request, "api/index.html")
 
+@login_required
+def entries_page(request):
+    return render(request, "api/entries.html")
+
 def get_visible_labs(user):
     '''Helper function to get labs visible to the user based on their role. Admin sees all, director sees their labs, member sees their labs.'''
     profile = user.userprofile
@@ -270,8 +274,15 @@ def create_work_entry(request):
 @login_required
 def monthly_user_entries(request):
     '''Endpoint to get all work entries for the current user in a given month/year and lab.'''
-    month = int(request.GET.get("month"))
-    year = int(request.GET.get("year"))
+    month = request.GET.get("month")
+    year = request.GET.get("year")
+
+    try:
+        month = int(month)
+        year = int(year)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid month/year"}, status=400)
+    
     lab_id = request.GET.get("lab")
 
     entries = WorkEntry.objects.filter(

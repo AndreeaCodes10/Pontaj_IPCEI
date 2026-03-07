@@ -29,32 +29,33 @@ const Auth = {
     },
 
     loadAuthArea(labId = null) {
-        let url = "/api/current-user/";
-        if (labId) url += `?lab=${labId}`;
 
-        fetch(url)
-            .then(res => res.json())
-            .then(user => {
-                const authArea = document.getElementById("authArea");
+    let url = "/api/current-user/";
+    if (labId) url += `?lab=${labId}`;
 
-                if (!user.username) {
-                    authArea.textContent = "Not logged in";
-                    return;
-                }
+    fetch(url)
+        .then(res => res.json())
+        .then(user => {
 
-                authArea.innerHTML = `
-                    <span class="auth-user">${user.username}</span>
-                    <span class="auth-role">(${user.lab_role || user.global_role})</span>
-                    <button class="logout-btn" id="logoutBtn">Logout</button>
-                `;
+            const usernameEl = document.getElementById("authUser");
+            const roleEl = document.getElementById("authRole");
+            const logoutBtn = document.getElementById("logoutBtn");
 
-                document
-                    .getElementById("logoutBtn")
-                    .addEventListener("click", () => this.logout());
+            if (!user.username) {
+                usernameEl.textContent = "Not logged in";
+                roleEl.textContent = "";
+                logoutBtn.style.display = "none";
+                return;
+            }
 
-                Export.applyPermissions(user);
+            usernameEl.textContent = user.username;
+            roleEl.textContent = `(${user.lab_role || user.global_role})`;
 
-            });
+            logoutBtn.addEventListener("click", () => this.logout());
+
+            Export.applyPermissions(user);
+
+        });
     }
     
 };

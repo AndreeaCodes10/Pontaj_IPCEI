@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{% static 'css/letter-p.png' %}">
     <title>Pontaj App</title>
     <script src="{% static 'api/labs.js' %}"></script>
     <script src="{% static 'api/calendar.js' %}"></script>
@@ -19,6 +20,7 @@
 
     <!-- External CSS -->
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    
 </head>
 <body>
 
@@ -26,8 +28,13 @@
     <h1 class="app-title">Pontaj App</h1>
 
     <div id="authArea" class="auth-area">
-        <!-- filled by JS -->
-    </div>
+
+    <span id="authUser" class="auth-user"></span>
+    <span id="authRole" class="auth-role"></span>
+
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+
+</div>
 </header>
 
 <div class="layout">
@@ -52,7 +59,12 @@
         <div class="progress-container">
             <div id="progressBar" class="progress-bar"></div>
         </div>
-        <div id="userEntries" class="sidebar-entries"></div>
+        <div class="actions">
+            <button id="openEntriesPage" class="btn-secondary">
+                Vezi activitățile mele
+            </button>
+        </div>
+        
     </aside>
 
     <main class="main-content">
