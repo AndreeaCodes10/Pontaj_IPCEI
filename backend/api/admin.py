@@ -30,8 +30,7 @@ class LabAdmin(admin.ModelAdmin):
 
 @admin.register(Subactivitate)
 class SubactivitateAdmin(admin.ModelAdmin):
-    list_display = ("nume", "lab", "livrabil")
-    list_filter = ("lab", "livrabil")
+    list_display = ("nume", "lab")
     search_fields = ("nume",)
 
 

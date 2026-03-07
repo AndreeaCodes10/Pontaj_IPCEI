@@ -51,14 +51,6 @@ def create_profile(sender, instance, created, **kwargs):
     
 class Subactivitate(models.Model):
 
-    LIVRABIL_CHOICES = [
-        ("cod", "Cod"),
-        ("raport", "Raport"),
-        ("prezentare", "Prezentare"),
-        ("documentatie", "Documentație"),
-        ("altul", "Altul"),
-    ]
-
     lab = models.ForeignKey(
         Lab,
         on_delete=models.CASCADE,
@@ -70,11 +62,6 @@ class Subactivitate(models.Model):
     # This is template-level description (multiple allowed per subactivity)
     descriere = models.TextField(blank=True)
 
-    livrabil = models.CharField(
-        max_length=20,
-        choices=LIVRABIL_CHOICES
-    )
-
     class Meta:
         unique_together = ("lab", "nume")
 
@@ -84,6 +71,13 @@ class Subactivitate(models.Model):
 
 
 class WorkEntry(models.Model):
+    LIVRABIL_CHOICES = [
+        ("cod", "Cod"),
+        ("raport", "Raport"),
+        ("prezentare", "Prezentare"),
+        ("documentatie", "Documentație"),
+        ("altul", "Altul"),
+    ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
@@ -95,6 +89,10 @@ class WorkEntry(models.Model):
     )
 
     # Common fields
+    livrabil = models.CharField(
+        max_length=20,
+        choices=LIVRABIL_CHOICES
+    )
     individual = models.BooleanField(default=False)
 
     date = models.DateField(default=timezone.now)

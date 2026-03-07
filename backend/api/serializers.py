@@ -25,16 +25,12 @@ class SubactivitateSerializer(serializers.ModelSerializer):
             "lab",
             "nume",
             "descriere",
-            "livrabil",
             "display_name",
             "display_livrabil"
         ]
 
-    def get_display_livrabil(self, obj):
-        return obj.get_livrabil_display()
-
     def get_display_name(self, obj):
-        return obj.get_nume_display()
+        return obj.nume()
     
 class WorkEntrySerializer(serializers.ModelSerializer):
     nr_ore = serializers.FloatField()
@@ -46,6 +42,7 @@ class WorkEntrySerializer(serializers.ModelSerializer):
             "user",
             "lab",
             "subactivitate",
+            "livrabil",
             "individual",
             "date",
             "nr_ore",

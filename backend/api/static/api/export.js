@@ -23,7 +23,7 @@ const Export = {
                 }
 
                 const [year, month] = monthInput.split("-");
-                const labId = document.getElementById("lab").value;
+                const labId = window.currentLabId;
 
                 window.location.href =
                 `/api/export-monthly-sheet/?lab_id=${labId}&month=${month}&year=${year}`;
