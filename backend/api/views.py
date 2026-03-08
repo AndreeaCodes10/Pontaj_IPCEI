@@ -218,6 +218,7 @@ def create_work_entry(request):
 
         nr_ore = data.get("nr_ore")
         durata = data.get("durata")
+        members = data.get("members", [])
         if not lab_id:
             return JsonResponse({"error": "Missing lab"}, status=400)
 
@@ -262,7 +263,11 @@ def create_work_entry(request):
         serializer = WorkEntrySerializer(data=data)
 
         if serializer.is_valid():
-            serializer.save(user=user)
+            entry = serializer.save(user=user)
+
+            if members:
+                users = User.objects.filter(id__in=members)
+                entry.members.set(users)
             return JsonResponse(serializer.data, status=201)
 
         print("SERIALIZER ERRORS:", serializer.errors)
@@ -302,6 +307,7 @@ def monthly_user_entries(request):
             "durata": e.durata,
             "activity_description": e.activity_description,
             "individual": e.individual,
+            "members": [u.username for u in e.members.all()],
             "links": e.links,
             "comentarii": e.comentarii,
         }

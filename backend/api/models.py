@@ -94,6 +94,7 @@ class WorkEntry(models.Model):
         choices=LIVRABIL_CHOICES
     )
     individual = models.BooleanField(default=False)
+    members = models.ManyToManyField(User, blank=True, related_name="shared_entries")
 
     date = models.DateField(default=timezone.now)
 

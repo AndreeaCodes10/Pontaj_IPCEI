@@ -35,6 +35,10 @@ const Form = {
         const startTime = document.getElementById("start_time").value;
         const nrOre = parseInt(document.getElementById("nr_ore").value, 10);
 
+        const selectedMembers = [
+            ...document.querySelectorAll("#members input:checked")
+        ].map(cb => cb.value);
+
         const endTime = this.addHoursToTime(startTime, nrOre);
         const durata = `${startTime}-${endTime}`;
 
@@ -43,6 +47,7 @@ const Form = {
             subactivitate: document.getElementById("subactivitate").value,
             livrabil: document.getElementById("livrabil").value,
             individual: document.getElementById("individual").value,
+            members: selectedMembers,
             date: formattedDate,
             durata: durata,
             nr_ore: nrOre,

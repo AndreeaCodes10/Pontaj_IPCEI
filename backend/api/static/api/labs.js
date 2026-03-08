@@ -31,9 +31,9 @@ const Labs = {
             if (!labId) return;
             const user = await Auth.getCurrentUser(labId);
             applyLabPermissions(user);
-
+            loadLabMembers(labId);
             if (user.global_role === "admin" || user.lab_role === "director") {
-                loadLabMembers(labId);
+                // loadLabMembers(labId);
                 loadAllUsers(labId);
             }
             Auth.loadAuthArea(labId); 
@@ -48,6 +48,16 @@ const Labs = {
             this.livrabilSelect.value = selected.dataset.livrabil || "";
             this.individualSelect.value =
                 selected.dataset.individual === "true" ? "true" : "false";
+        });
+
+        this.individualSelect.addEventListener("change", () => {
+            const membersBox = document.getElementById("membersContainer");
+
+            if (this.individualSelect.value === "false") {
+                membersBox.style.display = "flex";
+            } else {
+                membersBox.style.display = "none";
+            }
         });
     },
 
@@ -81,42 +91,24 @@ function applyLabPermissions(user) {
     }
 }
 
-/*async function loadLabMembers(labId) {
-    const res = await fetch(`/api/labs/${labId}/members/`);
-    const members = await res.json();
-
-    const list = document.getElementById("labMembersList");
-
-    list.innerHTML = members.map(m => `
-        <div class="member-row">
-            <span>${m.username}</span>
-            <button class="remove-member" data-id="${m.id}">✖</button>
-        </div>
-    `).join("");
-
-    list.querySelectorAll(".remove-member").forEach(btn => {
-        btn.addEventListener("click", async () => {
-            const uid = btn.dataset.id;
-            if (!confirm("Ștergi acest utilizator?")) return;
-
-            await fetch(`/api/labs/${labId}/remove/${uid}/`, {
-                method: "DELETE",
-                headers: { "X-CSRFToken": getCSRFToken() },
-                credentials: "same-origin"
-            });
-
-            loadLabMembers(labId);
-        });
-    });
-}*/
-
 async function loadLabMembers(labId) {
     const res = await fetch(`/api/labs/${labId}/members/`);
     const members = await res.json();
-
     const user = await Auth.getCurrentUser(labId);
-
     const list = document.getElementById("labMembersList");
+    const membersBox = document.getElementById("members");
+
+    if (membersBox){
+        membersBox.innerHTML = members.map(m => {
+            return `
+            <label class="member-pill">
+                <input type="checkbox" value="${m.id}">
+                ${m.username}
+            </label>
+        `;
+    }).join("");
+
+    }
 
     list.innerHTML = members.map(m => {
 
@@ -156,28 +148,6 @@ async function loadLabMembers(labId) {
     });
 }
 
-// async function loadAllUsers(labId) {
-//     const res = await fetch("/api/all-users/");
-//     const users = await res.json();
-
-//     const panel = document.getElementById("labMembersPanel");
-
-//     panel.insertAdjacentHTML("beforeend", `
-//         <select id="addUserSelect">
-//             ${users.map(u => `<option value="${u.id}">${u.username}</option>`).join("")}
-//         </select>
-//         <button id="addUserBtn">Add</button>
-//     `);
-
-//     document.getElementById("addUserBtn").onclick = async () => {
-//         const uid = document.getElementById("addUserSelect").value;
-//         await fetch(`/api/labs/${labId}/add/${uid}/`, {
-//             method: "POST",
-//             headers: { "X-CSRFToken": getCSRFToken() }
-//         });
-//         loadLabMembers(labId);
-//     };
-// }
 
 async function loadAllUsers(labId) {
     const res = await fetch("/api/all-users/");

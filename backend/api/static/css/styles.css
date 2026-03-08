@@ -152,6 +152,40 @@ textarea:focus{
 .row{display:flex;gap:1rem}
 .row .form-group{flex:1}
 
+.inline-members{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+#membersContainer{
+    display:none;
+    align-items:center;
+    gap:8px;
+}
+
+#members{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+}
+
+.member-pill{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:4px 8px;
+    border:1px solid var(--primary-hover);
+    border-radius:20px;
+    cursor:pointer;
+    font-size:13px;
+}
+
+.member-pill input{
+    accent-color:var(--primary);
+    cursor: pointer;
+}
+
 /* Buttons */
 button{
   padding:.7rem 1.2rem;

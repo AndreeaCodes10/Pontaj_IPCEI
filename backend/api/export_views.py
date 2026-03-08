@@ -10,6 +10,7 @@ from io import BytesIO
 from openpyxl.utils import get_column_letter
 from collections import defaultdict
 
+
 def AG_workbook(lab, month, year):
 
     wb = Workbook()
@@ -17,9 +18,9 @@ def AG_workbook(lab, month, year):
     ws.title = "Pontaj"
 
     ws.append([
-        "User","Lab","Subactivitate","Livrabil","Individual",
+        "User","Lab","Subactivitate","Livrabil","Individual","Members",
         "Data","Nr ore","Durata","Descriere activitate","Comentarii","Links"
-    ])
+        ])
 
     entries = WorkEntry.objects.select_related(
         "user", "lab", "subactivitate"
@@ -36,6 +37,7 @@ def AG_workbook(lab, month, year):
             e.subactivitate.nume,
             e.livrabil,
             "Da" if e.individual else "Nu",
+            ", ".join([u.username for u in e.members.all()]),
             e.date.strftime("%d-%m-%Y"),
             e.nr_ore,
             e.durata,
