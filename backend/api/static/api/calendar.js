@@ -141,7 +141,7 @@ async function loadUserEntries(month, year) {
                 `).join("")}
             </tbody>
         </table>
-        </dv>
+        </div>
         `;
 
     let sortDirection = 1;

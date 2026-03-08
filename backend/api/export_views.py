@@ -10,6 +10,12 @@ from io import BytesIO
 from openpyxl.utils import get_column_letter
 from collections import defaultdict
 
+users = list(User.objects.all().order_by("last_name"))
+
+def get_initials(user):
+    first = user.first_name[:1].upper() if user.first_name else ""
+    last = user.last_name[:1].upper() if user.last_name else ""
+    return f"{first}{last}"
 
 def AG_workbook(lab, month, year):
 
@@ -17,10 +23,21 @@ def AG_workbook(lab, month, year):
     ws = wb.active
     ws.title = "Pontaj"
 
-    ws.append([
-        "User","Lab","Subactivitate","Livrabil","Individual","Members",
-        "Data","Nr ore","Durata","Descriere activitate","Comentarii","Links"
-        ])
+    # ws.append([
+    #     "User","Lab","Subactivitate","Livrabil","Individual","Members",
+    #     "Data","Nr ore","Durata","Descriere activitate","Comentarii","Links"
+    #     ])
+    header = [
+        "User","Lab","Subactivitate","Livrabil","Individual"
+        ]
+
+    header += [get_initials(u) for u in users]
+
+    header += [
+    "Data","Nr ore","Durata","Descriere activitate","Comentarii","Links"
+    ]
+
+    ws.append(header)
 
     entries = WorkEntry.objects.select_related(
         "user", "lab", "subactivitate"
@@ -30,21 +47,48 @@ def AG_workbook(lab, month, year):
         date__month=month
     )
 
+    # for e in entries:
+    #     ws.append([
+    #         e.user.username if e.user else "Anonymous",
+    #         e.lab.name,
+    #         e.subactivitate.nume,
+    #         e.livrabil,
+    #         "Da" if e.individual else "Nu",
+    #         ", ".join([u.username for u in e.members.all()]),
+    #         e.date.strftime("%d-%m-%Y"),
+    #         e.nr_ore,
+    #         e.durata,
+    #         e.activity_description,
+    #         e.comentarii,
+    #         e.links,
+    #     ])
+
     for e in entries:
-        ws.append([
+        member_ids = set(e.members.values_list("id", flat=True))
+        if e.user:
+            member_ids.add(e.user.id)
+        member_columns = [
+            "✓" if u.id in member_ids else ""
+            for u in users
+        ]
+        row = [
             e.user.username if e.user else "Anonymous",
             e.lab.name,
             e.subactivitate.nume,
             e.livrabil,
             "Da" if e.individual else "Nu",
-            ", ".join([u.username for u in e.members.all()]),
+        ]
+        row += member_columns
+        row += [
             e.date.strftime("%d-%m-%Y"),
             e.nr_ore,
             e.durata,
             e.activity_description,
             e.comentarii,
             e.links,
-        ])
+        ]
+        ws.append(row)
+
     for col in ws.columns:
         max_length = 0
         column = col[0].column_letter
