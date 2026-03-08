@@ -104,28 +104,35 @@ async function loadUserEntries(month, year) {
     }
 
     container.innerHTML = `
+        <div class="entries-table-container">
         <table class="entries-table">
             <thead>
                 <tr>
-                    <th>Data</th>
-                    <th>Lab</th>
-                    <th>Subactivitate</th>
-                    <th>Livrabil</th>
-                    <th>Descriere</th>
-                    <th>Durata</th>
-                    <th>Comentarii</th>
-                    <th></th>
+                <th data-sort="date">Data</th>
+                <th data-sort="nr_ore">Nr Ore</th>
+                <th data-sort="durata">Durata</th>
+                <th data-sort="lab">Lab</th>
+                <th data-sort="subactivitate">Subactivitate</th>
+                <th data-sort="activity_description">Descriere</th>
+                <th data-sort="individual">Individual</th>
+                <th data-sort="livrabil">Livrabil</th>
+                <th data-sort="links">Links</th>
+                <th data-sort="comentarii">Comentarii</th>
+                <th></th>
                 </tr>
             </thead>
             <tbody>
                 ${entries.map(e => `
                     <tr>
                         <td>${e.date}</td>
+                        <td>${e.nr_ore}</td>
+                        <td>${e.durata}</td>
                         <td>${e.lab}</td>
                         <td>${e.subactivitate}</td>
-                        <td>${e.livrabil}</td>
                         <td>${e.activity_description}</td>
-                        <td>${e.durata}</td>
+                        <td>${e.individual ? "Da" : "Nu"}</td>
+                        <td>${e.livrabil}</td>
+                        <td><a href="${e.links}" target="_blank">${e.links}</a></td>
                         <td>${e.comentarii}</td>
                         <td>
                             <button data-id="${e.id}" class="delete-entry">✖</button>
@@ -134,7 +141,34 @@ async function loadUserEntries(month, year) {
                 `).join("")}
             </tbody>
         </table>
+        </dv>
         `;
+
+    let sortDirection = 1;
+
+    container.querySelectorAll("th[data-sort]").forEach(header => {
+        header.addEventListener("click", () => {
+            const key = header.dataset.sort;
+            entries.sort((a, b) => {
+
+                let valA = a[key];
+                let valB = b[key];
+
+                if (key === "date") {
+                    valA = new Date(valA);
+                    valB = new Date(valB);
+                }
+
+                if (valA > valB) return 1 * sortDirection;
+                if (valA < valB) return -1 * sortDirection;
+                return 0;
+
+            });
+            sortDirection *= -1;
+            loadUserEntries(month, year);
+        });
+
+    });    
 
     container.querySelectorAll(".delete-entry").forEach(btn => {
     btn.addEventListener("click", async () => {

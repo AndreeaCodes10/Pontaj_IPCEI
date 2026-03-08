@@ -42,7 +42,7 @@ header h1 {
 .login-container button {
     width: 100%;
     padding: 10px;
-    background: #8e6bff;
+    background: #0A72C7;
     color: white;
     border: none;
     border-radius: 8px;
@@ -51,5 +51,5 @@ header h1 {
 }
 
 .login-container button:hover {
-    background: #7552e6;
+    background: #064980;
 }

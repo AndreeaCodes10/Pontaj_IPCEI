@@ -195,10 +195,10 @@ def upt_workbook(lab, users, month, year, director):
     return wb
 
 
-def build_centralizator_sheet(wb, users, year, month):
+def build_sumary_sheet(wb, users, year, month):
 
-    ws = wb.create_sheet("Centralizator")
-
+    ws = wb.create_sheet("Sumary")
+    month_name = calendar.month_name[month].lower()
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     bold = Font(bold=True)
 
@@ -208,6 +208,21 @@ def build_centralizator_sheet(wb, users, year, month):
         top=Side(style="thin"),
         bottom=Side(style="thin"),
     )
+
+    # ---------------- HEADER ----------------
+    ws["A2"] = "Indirect partner name:"
+    ws["A3"] = "Project name:"
+    ws["A4"] = "Contract PI/C9/I4 nr:"
+
+    for r in (2,3,4):
+        ws.merge_cells(start_row=r,start_column=1,end_row=r,end_column=3)
+
+    ws["A5"] = f"PONTAJ INDIVIDUAL PENTRU LUNA {month_name}"
+    ws.merge_cells("A5:E5")
+    ws["G5"] = f"ANUL {year}"
+
+    ws["A7"] = f"PONTAJ CENTRALIZAT PENTRU LUNA: {month} ANUL {year}"
+    ws.merge_cells("A7:E7")
 
     header_row = 9
 
@@ -309,18 +324,35 @@ def build_centralizator_sheet(wb, users, year, month):
         for c in range(1,8):
             ws.cell(r,c).border = thin
 
-    # ---------------- AUTO WIDTH ----------------
+    ws.cell(row+4,2,"Aprobat,")
+    ws.cell(row+5,2,"Director de proiect,")
+    ws.merge_cells(start_row=row+4,start_column=2,end_row=row+4,end_column=3)
+    ws.cell(row+4,4,"Avizat,")
+    ws.cell(row+5,4,"Coordonator achizitii si resursa umana,")
+    ws.merge_cells(start_row=row+5,start_column=4,end_row=row+5,end_column=7)
 
-    for col in ws.columns:
+    # auto width
+    merged_starts = {
+        (r.min_row, r.min_col): r
+        for r in ws.merged_cells.ranges
+    }
 
+    for col in range(1, ws.max_column + 1):
         max_len = 0
-        column = col[0].column_letter
+        for row in range(1, ws.max_row + 1):
 
-        for cell in col:
-            if cell.value:
-                max_len = max(max_len, len(str(cell.value)))
+            cell = ws.cell(row, col)
+            if not cell.value:
+                continue
 
-        ws.column_dimensions[column].width = max_len + 2
+            # Skip merged cells spanning multiple columns
+            merged = merged_starts.get((row, col))
+            if merged and merged.max_col > merged.min_col:
+                continue
+
+            max_len = max(max_len, len(str(cell.value)))
+
+        ws.column_dimensions[get_column_letter(col)].width = max_len + 2
 
 
 def conti_workbook(lab, users, month, year, director):
@@ -506,7 +538,7 @@ def conti_workbook(lab, users, month, year, director):
 
             ws.column_dimensions[get_column_letter(col)].width = max_len + 2
 
-    build_centralizator_sheet(wb, users, year, month)
+    build_sumary_sheet(wb, users, year, month)
     return wb
 
 @require_http_methods(["GET"])

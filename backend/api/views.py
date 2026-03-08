@@ -295,11 +295,14 @@ def monthly_user_entries(request):
         {
             "id": e.id,
             "date": e.date.strftime("%d-%m-%Y"),
+            "nr_ore": e.nr_ore,
             "lab": e.lab.name if e.lab else "",
             "subactivitate": e.subactivitate.nume if e.subactivitate else "",
             "livrabil": e.livrabil if e.livrabil else "N/A",
             "durata": e.durata,
             "activity_description": e.activity_description,
+            "individual": e.individual,
+            "links": e.links,
             "comentarii": e.comentarii,
         }
         for e in entries
