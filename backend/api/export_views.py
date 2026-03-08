@@ -7,6 +7,8 @@ from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from .models import Lab, LabMembership, User, WorkEntry
 import zipfile
 from io import BytesIO
+from openpyxl.utils import get_column_letter
+from collections import defaultdict
 
 def AG_workbook(lab, month, year):
 
@@ -162,199 +164,350 @@ def upt_workbook(lab, users, month, year, director):
         row += 8
 
     # Make columns auto width
-    for col in ws.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                max_length = max(max_length, len(str(cell.value)))
-            except:
-                pass
-        if column == "A":
-            print("max len",max_length)
-            ws.column_dimensions[column].width = max_length - 5
-        else:
-            ws.column_dimensions[column].width = max_length
+    merged_starts = {
+        (r.min_row, r.min_col): r
+        for r in ws.merged_cells.ranges
+    }
 
-    ws.cell(row=row, column=1, value="Director/Responsabil Proiect Cercetare")
-    ws.cell(row=row+1, column=1, value=f"Prof. dr. {director.last_name} {director.first_name}")
+    for col in range(1, ws.max_column + 1):
+        max_len = 0
+        for row in range(1, ws.max_row + 1):
 
-    ws.cell(row=row, column=last_col-2, value="Întocmit,")
-    ws.cell(row=row+1, column=last_col-2, value=f"Prof. dr. {director.last_name} {director.first_name}")
+            cell = ws.cell(row, col)
+            if not cell.value:
+                continue
+
+            # Skip merged cells spanning multiple columns
+            merged = merged_starts.get((row, col))
+            if merged and merged.max_col > merged.min_col:
+                continue
+
+            max_len = max(max_len, len(str(cell.value)))
+
+        ws.column_dimensions[get_column_letter(col)].width = max_len + 2
+
+    ws.cell(row=row+2, column=1, value="Director/Responsabil Proiect Cercetare")
+    ws.cell(row=row+3, column=1, value=f"Prof. dr. {director.last_name} {director.first_name}")
+
+    ws.cell(row=row+2, column=last_col-2, value="Întocmit,")
+    ws.cell(row=row+3, column=last_col-2, value=f"Prof. dr. {director.last_name} {director.first_name}")
 
     return wb
 
 
+def build_centralizator_sheet(wb, users, year, month):
+
+    ws = wb.create_sheet("Centralizator")
+
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    bold = Font(bold=True)
+
+    thin = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+
+    header_row = 9
+
+    # ---------------- HEADER ----------------
+
+    ws.merge_cells(start_row=header_row, start_column=1, end_row=header_row+1, end_column=1)
+    ws.cell(header_row,1,"NR. CRT.").alignment = center
+    ws.cell(header_row,1).font = bold
+
+    ws.merge_cells(start_row=header_row, start_column=2, end_row=header_row+1, end_column=2)
+    ws.cell(header_row,2,"PERSONAL ANGAJAT").alignment = center
+    ws.cell(header_row,2).font = bold
+
+    ws.merge_cells(start_row=header_row, start_column=3, end_row=header_row, end_column=6)
+    ws.cell(header_row,3,"NUMAR ORE PE ACTIVITATI").alignment = center
+    ws.cell(header_row,3).font = bold
+
+    ws.cell(header_row+1,3,"A1")
+    ws.cell(header_row+1,4,"A2")
+    ws.cell(header_row+1,5,"A3")
+    ws.cell(header_row+1,6,"A4")
+
+    for c in range(3,7):
+        ws.cell(header_row+1,c).alignment = center
+        ws.cell(header_row+1,c).font = bold
+
+    ws.merge_cells(start_row=header_row, start_column=7, end_row=header_row+1, end_column=7)
+    ws.cell(header_row,7,"TOTAL zi").alignment = center
+    ws.cell(header_row,7).font = bold
+
+    # ---------------- FETCH ENTRIES ----------------
+
+    entries = WorkEntry.objects.filter(
+        user__in=users,
+        date__year=year,
+        date__month=month
+    ).select_related("user","lab")
+
+    # hours[(user_id, lab_id, day)] = hours
+    hours = defaultdict(int)
+
+    for e in entries:
+        hours[(e.user_id, e.lab_id)] += e.nr_ore
+
+    # determine labs automatically
+    # labs = list({e.lab_id for e in entries})[:4]
+    labs = list(dict.fromkeys(e.lab_id for e in entries))[:4]
+    lab_index = {lab_id:i for i,lab_id in enumerate(labs)}
+
+    # ---------------- TABLE BODY ----------------
+
+    start_row = header_row + 2
+    row = start_row
+
+    total_lab = defaultdict(int)
+
+    for i, user in enumerate(users, start=1):
+
+        ws.cell(row,1,i).alignment = center
+        ws.cell(row,2,f"{user.last_name} {user.first_name}")
+
+        total_zi = 0
+
+        for lab_id, i_lab in lab_index.items():
+            col = 3 + i_lab
+
+            h = hours.get((user.id, lab_id), 0)
+
+            ws.cell(row,col,h)
+
+            total_zi += h
+            total_lab[lab_id] += h
+
+        ws.cell(row,7,total_zi).alignment = center
+
+        row += 1
+
+    # ---------------- MONTH TOTALS ----------------
+
+    ws.cell(row,1,"TOTAL LAB").font = bold
+    grand_total = 0
+
+    for lab_id,i in lab_index.items():
+
+        col = 3 + i
+        val = total_lab[lab_id]
+
+        ws.cell(row,col,val).font = bold
+        ws.cell(row,col).alignment = center
+
+        grand_total += val
+
+    ws.cell(row,7,grand_total).font = bold
+    ws.cell(row,7).alignment = center
+
+    # ---------------- BORDERS ----------------
+
+    for r in range(header_row, row+1):
+        for c in range(1,8):
+            ws.cell(r,c).border = thin
+
+    # ---------------- AUTO WIDTH ----------------
+
+    for col in ws.columns:
+
+        max_len = 0
+        column = col[0].column_letter
+
+        for cell in col:
+            if cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+
+        ws.column_dimensions[column].width = max_len + 2
+
+
 def conti_workbook(lab, users, month, year, director):
-    days_in_month = calendar.monthrange(year, month)[1]
+
+    days = calendar.monthrange(year, month)[1]
     month_name = calendar.month_name[month].lower()
 
     wb = Workbook()
     wb.remove(wb.active)
 
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    bold = Font(bold=True)
     center_wrapped = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    bold = Font(bold=True)
 
     weekend_fill = PatternFill(start_color="E82F32", end_color="E82F32", fill_type="solid")
 
-    last_col = days_in_month + 2
-
-    row = 9
-
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-    bold_border = Border(
-        left=Side(style="thick"),
-        right=Side(style="thick"),
-        top=Side(style="thick"),
-        bottom=Side(style="thick"),
-    )
+    thin = Border(*(Side(style="thin"),)*4)
+    thick = Border(*(Side(style="thick"),)*4)
 
     for user in users:
 
-        ws = wb.create_sheet(title=f"{user.last_name}_{user.first_name}")
-        # ------------------HEADER--------------------------
+        ws = wb.create_sheet(f"{user.last_name}_{user.first_name}")
+
+        # ---------------- HEADER ----------------
         ws["A2"] = "Indirect partner name:"
-        ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=3)
-
         ws["A3"] = "Project name:"
-        ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=3)
-
         ws["A4"] = "Contract PI/C9/I4 nr:"
-        ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=3)
+
+        for r in (2,3,4):
+            ws.merge_cells(start_row=r,start_column=1,end_row=r,end_column=3)
 
         ws["A6"] = f"PONTAJ INDIVIDUAL PENTRU LUNA {month_name}"
-        ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=5)
-        ws.cell(row=6, column=1).alignment = center
+        ws.merge_cells("A6:E6")
         ws["G6"] = f"ANUL {year}"
 
-        ws["A7"] = f" NUME SI PRENUME: {user.last_name} {user.first_name}"
-        ws.merge_cells(start_row=7, start_column=1, end_row=7, end_column=5)
-        #-------------------------------------------------------------------------
+        ws["A7"] = f"NUME SI PRENUME: {user.last_name} {user.first_name}"
+        ws.merge_cells("A7:E7")
 
-        ws.cell(row=row, column=1, value="Activitate")
-        ws.cell(row=row, column=2, value="Denumire activitate sumar")
-        ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=5)
-        ws.cell(row=row, column=6, value="Mapare activitate partener direct")
-        ws.merge_cells(start_row=row, start_column=6, end_row=row, end_column=10)
-        for j in (1,10):
-            ws.cell(row=row, column=j).border = bold_border
-                    
-        for i in range(1, 9):
-            rr = row + i
+        # ------------- ACTIVITIES TABLE -------------
+        start = 9
 
-            ws.cell(row=rr, column=1, value=f"A{i}")
+        ws.cell(start,1,"Activitate")
+        ws.cell(start,2,"Denumire activitate sumar")
+        ws.merge_cells(start_row=start,start_column=2,end_row=start,end_column=5)
 
-            ws.merge_cells(start_row=rr, start_column=2, end_row=rr, end_column=5)
-            ws.merge_cells(start_row=rr, start_column=6, end_row=rr, end_column=10)
+        ws.cell(start,6,"Mapare activitate partener direct")
+        ws.merge_cells(start_row=start,start_column=6,end_row=start,end_column=10)
 
-            for c in range(1, 11):
-                ws.cell(row=rr, column=c).border = thin_border
+        for i in range(1,9):
+            r = start+i
+            ws.cell(r,1,f"A{i}")
+            ws.merge_cells(start_row=r,start_column=2,end_row=r,end_column=5)
+            ws.merge_cells(start_row=r,start_column=6,end_row=r,end_column=10)
 
-        r=20
-        ws.cell(row=r, column=1, value=f"DATA")
-        ws.merge_cells(start_row=r, start_column=1, end_row=r+2, end_column=1)
-        ws.cell(row=r, column=1).alignment = center_wrapped
-        ws.cell(row=r, column=1).font = bold
+        for r in range(start,start+9):
+            for c in range(1,11):
+                ws.cell(r,c).border=thin
+        # ------------- DAILY TABLE -------------
+        r0 = 20
 
-        ws.cell(row=r, column=2, value=f"ACTIVITATI")
-        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=9)
-        ws.cell(row=r, column=2).alignment = center_wrapped
-        ws.cell(row=r, column=2).font = bold
+        ws.cell(r0,1,"DATA").font=bold
+        ws.merge_cells(start_row=r0,start_column=1,end_row=r0+2,end_column=1)
+        ws.cell(row=r0, column=1).alignment = center_wrapped
 
-        ws.cell(row=r, column=10, value=f"TOTAL")
-        ws.merge_cells(start_row=r, start_column=10, end_row=r+2, end_column=10)
-        ws.cell(row=r, column=10).alignment = center_wrapped
-        ws.cell(row=r, column=10).font = bold
+        ws.cell(r0,2,"ACTIVITATI").font=bold
+        ws.merge_cells(start_row=r0,start_column=2,end_row=r0,end_column=9)
+        ws.cell(row=r0, column=2).alignment = center_wrapped
 
-        activities = ["A1","A2","A3","A4"]
+        ws.cell(r0,10,"TOTAL").font=bold
+        ws.merge_cells(start_row=r0,start_column=10,end_row=r0+2,end_column=10)
+        ws.cell(row=r0, column=10).alignment = center_wrapped
 
-        col = 2
-
-        for act in activities:
-            ws.cell(row=r+1, column=col, value=act)
-            ws.cell(row=r+1, column=col).font = bold
-            ws.merge_cells(start_row=r+1, start_column=col, end_row=r+1, end_column=col+1)
-
-            ws.cell(row=r+2, column=col, value="nr ore")
-            ws.cell(row=r+2, column=col+1, value="interval")
-
-            col += 2
-
-        # DAYS HEADER
-        for d in range(1, days_in_month + 1):
-            weekday = calendar.weekday(year, month, d)
-            day_row = d + 2 + r
-
-            cell = ws.cell(row=day_row, column=1, value=f"{d}")
-            cell.alignment = center
-            cell.font = bold
-
-            if weekday >= 5:
-                for col in range(1, 10):
-                    ws.cell(row=day_row, column=col).fill = weekend_fill
-
-        
-        entries = WorkEntry.objects.filter(
-            user=user,
-            lab=lab,
-            date__year=year,
-            date__month=month
+        labs = list(
+            WorkEntry.objects
+            .filter(user=user,date__year=year,date__month=month)
+            .values_list("lab",flat=True)
+            .distinct()[:4]
         )
 
-        durata_by_day = {}
-        hours_by_day = {}
+        lab_index = {lab_id:i for i,lab_id in enumerate(labs)}
+
+        # headers A1-A4
+        for i in range(4):
+            col = 2+i*2
+            ws.cell(r0+1,col,f"A{i+1}").font=bold
+            ws.merge_cells(start_row=r0+1,start_column=col,end_row=r0+1,end_column=col+1)
+            ws.cell(row=r0+1, column=col).alignment = center_wrapped
+
+            ws.cell(r0+2,col,"nr ore")
+            ws.cell(r0+2,col+1,"interval")
+
+        # fetch entries
+        entries = WorkEntry.objects.filter(
+            user=user,
+            date__year=year,
+            date__month=month
+        ).select_related("lab")
+
+        hours = {}
+        durata = {}
 
         for e in entries:
-            durata_by_day[e.date.day] = e.durata
-            hours_by_day[e.date.day] = e.nr_ore
+            key = (e.lab_id,e.date.day)
+            hours[key] = e.nr_ore
+            durata[key] = e.durata
 
+        total_month = 0
+        totals_lab = {lab_id:0 for lab_id in labs}
 
-        total = 0
+        # days loop
+        for d in range(1,days+1):
 
-        for d in range(1, days_in_month + 1):
+            row = r0+2+d
+            ws.cell(row,1,d).alignment=center
 
-            day_row = r + 2 + d
+            total_day = 0
 
-            durata = durata_by_day.get(d, "")
-            ore = hours_by_day.get(d, "")
+            for lab_id,i in lab_index.items():
 
-            ws.cell(row=day_row, column=2, value=ore)
-            ws.cell(row=day_row, column=2).alignment = center_wrapped
-            ws.cell(row=day_row, column=3, value=durata)
-            ws.cell(row=day_row, column=3).alignment = center_wrapped
+                col = 2+i*2
 
-            if isinstance(ore, (int, float)):
-                total += ore
+                h = hours.get((lab_id,d),"")
+                dur = durata.get((lab_id,d),"")
 
-        for r in range(r, day_row+1):
-            for c in range(1, 11):
-                ws.cell(row=r, column=c).border = thin_border
+                ws.cell(row,col,h).alignment=center
+                ws.cell(row,col+1,dur).alignment=center
 
-        # Make columns auto width
-        for col in ws.columns:
-            max_length = 0
-            column = col[0].column_letter
-            for cell in col:
-                try:
-                    max_length = max(max_length, len(str(cell.value)))
-                except:
-                    pass
-            ws.column_dimensions[column].width = max_length
+                if isinstance(h,(int,float)):
+                    total_day += h
+                    totals_lab[lab_id]+=h
 
-    ws.cell(row=row, column=1, value="Director/Responsabil Proiect Cercetare")
-    ws.cell(row=row+1, column=1, value=f"Prof. dr. {director.last_name} {director.first_name}")
+            ws.cell(row,10,total_day)
 
-    ws.cell(row=row, column=last_col-2, value="Întocmit,")
-    ws.cell(row=row+1, column=last_col-2, value=f"Prof. dr. {director.last_name} {director.first_name}")
+            total_month += total_day
 
+            if calendar.weekday(year,month,d)>=5:
+                for c in range(1,11):
+                    ws.cell(row,c).fill=weekend_fill
+
+        # totals per lab
+        end = r0+2+days+1
+        ws.cell(end,1,"TOTAL Lab").font=bold
+
+        for lab_id,i in lab_index.items():
+            col = 2+i*2
+            ws.cell(end,col,totals_lab[lab_id])
+
+        ws.cell(end,10,total_month).font=bold
+
+        # borders
+        for r in range(r0,end+1):
+            for c in range(1,11):
+                ws.cell(r,c).border=thin
+
+        ws.cell(end+2,5,"Semnătura,")
+        ws.cell(end+5,2,"Aprobat,")
+        ws.cell(end+6,2,"Director de proiect,")
+        ws.merge_cells(start_row=end+6,start_column=2,end_row=end+6,end_column=3)
+        ws.cell(end+5,8,"Avizat,")
+        ws.cell(end+6,8,"Coordonator achizitii si resursa umana,")
+        ws.merge_cells(start_row=end+6,start_column=8,end_row=end+6,end_column=11)
+
+        # auto width
+        merged_starts = {
+            (r.min_row, r.min_col): r
+            for r in ws.merged_cells.ranges
+        }
+
+        for col in range(1, ws.max_column + 1):
+            max_len = 0
+            for row in range(1, ws.max_row + 1):
+
+                cell = ws.cell(row, col)
+                if not cell.value:
+                    continue
+
+                # Skip merged cells spanning multiple columns
+                merged = merged_starts.get((row, col))
+                if merged and merged.max_col > merged.min_col:
+                    continue
+
+                max_len = max(max_len, len(str(cell.value)))
+
+            ws.column_dimensions[get_column_letter(col)].width = max_len + 2
+
+    build_centralizator_sheet(wb, users, year, month)
     return wb
-
 
 @require_http_methods(["GET"])
 def export_excel(request):
