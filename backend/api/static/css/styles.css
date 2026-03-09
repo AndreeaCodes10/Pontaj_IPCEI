@@ -37,6 +37,12 @@ body{
   background:#1f2937;
   color:#fff;
 }
+.logos{
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  gap: calc(10px * var(--scale));
+}
 
 .app-title{font-size:calc(20px*var(--scale))}
 
