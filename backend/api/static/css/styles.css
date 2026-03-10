@@ -30,11 +30,10 @@ body{
 
 /* Top bar */
 .topbar{
-  max-height: 140px;
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:calc(10px*var(--scale)) calc(15px*var(--scale));
+  padding:calc(12px*var(--scale)) calc(20px*var(--scale));
   background:#1f2937;
   color:#fff;
 }
@@ -51,12 +50,12 @@ body{
   display:flex;
   align-items:center;
   gap:12px;
-  font-size: calc(19px*var(--scale));
+  font-size:.9rem;
   color:var(--muted);
 }
 
 .auth-user{font-weight:600; color:#fff}
-.auth-role{opacity:.8;font-size:calc(18px*var(--scale)); color:#fff}
+.auth-role{opacity:.8;font-size:14px; color:#fff}
 
 .logout-btn{
   padding:6px 12px;
