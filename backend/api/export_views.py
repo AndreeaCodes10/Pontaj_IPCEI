@@ -4,7 +4,6 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
-from openpyxl.comments import Comment
 from .models import Lab, LabMembership, User, WorkEntry
 import zipfile
 from io import BytesIO
@@ -23,42 +22,22 @@ def AG_workbook(lab, month, year):
     wb = Workbook()
     ws = wb.active
     ws.title = "Pontaj"
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-    header_fill = PatternFill(start_color="ab9896", end_color="ab9896", fill_type="solid")
 
     # ws.append([
     #     "User","Lab","Subactivitate","Livrabil","Individual","Members",
     #     "Data","Nr ore","Durata","Descriere activitate","Comentarii","Links"
     #     ])
     header = [
-        "Data","Nr ore","Durata","User","Lab","Subactivitate","Descriere","Individual","Livrabil","Links"
+        "User","Lab","Subactivitate","Livrabil","Individual"
         ]
 
     header += [get_initials(u) for u in users]
 
     header += [
-    "Comentarii",
-    "Validat L2",
-    "Validat Aumovio",
-    "Validat P. Demian"
+    "Data","Nr ore","Durata","Descriere activitate","Comentarii","Links"
     ]
-    
-    ws.append(header)
 
-    # apply background fill to header row
-    for col_idx in range(1, len(header) + 1):
-        ws.cell(row=1, column=col_idx).fill = header_fill
-    
-    base_columns = 10 
-    for idx, user in enumerate(users):
-        col_idx = base_columns + 1 + idx
-        full_name = f"{user.first_name} {user.last_name}"
-        ws.cell(row=1, column=col_idx).comment = Comment(full_name, "")
+    ws.append(header)
 
     entries = WorkEntry.objects.select_related(
         "user", "lab", "subactivitate"
@@ -86,7 +65,6 @@ def AG_workbook(lab, month, year):
 
     for e in entries:
         member_ids = set(e.members.values_list("id", flat=True))
-        nume_utilizator = e.user.first_name+" "+e.user.last_name
         if e.user:
             member_ids.add(e.user.id)
         member_columns = [
@@ -94,20 +72,20 @@ def AG_workbook(lab, month, year):
             for u in users
         ]
         row = [
-            e.date.strftime("%d-%m-%Y"),
-            e.nr_ore,
-            e.durata,
-            nume_utilizator if e.user else "Anonymous",
+            e.user.username if e.user else "Anonymous",
             e.lab.name,
             e.subactivitate.nume,
-            e.activity_description,
-            "Da" if e.individual else "Nu",
             e.livrabil,
-            e.links,
+            "Da" if e.individual else "Nu",
         ]
         row += member_columns
         row += [
+            e.date.strftime("%d-%m-%Y"),
+            e.nr_ore,
+            e.durata,
+            e.activity_description,
             e.comentarii,
+            e.links,
         ]
         ws.append(row)
 
@@ -120,11 +98,6 @@ def AG_workbook(lab, month, year):
             except:
                 pass
         ws.column_dimensions[column].width = max_length + 2
-
-    # apply thin border to every cell in worksheet
-    for row in ws.iter_rows():
-        for cell in row:
-            cell.border = thin_border
 
     return wb
 
