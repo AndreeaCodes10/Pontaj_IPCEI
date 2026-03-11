@@ -14,8 +14,12 @@
 <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 
 <script src="{% static 'api/labs.js' %}"></script>
+<script src="{% static 'api/export.js' %}"></script>
 <script src="{% static 'api/auth.js' %}"></script>
+
+<script src="{% static 'api/entries.js' %}"></script>
 <script src="{% static 'api/calendar.js' %}"></script>
+<script src="{% static 'api/members.js' %}"></script>
 
 </head>
 
@@ -65,71 +69,12 @@
 © 2026 Pontaj App · Built for lab tracking in IPCEI project
 </footer>
 
+<script src="{% static 'api/entriesPage.js' %}"></script>
 
 <script>
-
-document.addEventListener("DOMContentLoaded", async () => {
-
-    await Labs.init();
-    Auth.init();
-
-    const labSelect = document.getElementById("lab");
-    const monthInput = document.getElementById("monthSelect");
-    const now = new Date();
-    monthInput.value = now.toISOString().slice(0,7); // YYYY-MM
-
-    // If user belongs to only one lab, select it automatically
-    if (labSelect.options.length === 1) {
-        labSelect.selectedIndex = 0;
-    }
-
-    const params = new URLSearchParams(window.location.search);
-
-    const labParam = params.get("lab");
-    const monthParam = params.get("month");
-    const yearParam = params.get("year");
-
-    
-
-    if (monthParam && yearParam) {
-        monthInput.value = `${yearParam}-${String(monthParam).padStart(2,"0")}`;
-    } else {
-        monthInput.value = now.toISOString().slice(0,7);
-    }
-
-    if (labParam) {
-        labSelect.value = labParam;
-    }
-
-    window.currentLabId = labSelect.value;
-    await Auth.loadAuthArea(window.currentLabId);
-    updateEntries();
-
+document.addEventListener("DOMContentLoaded", () => {
+    EntriesPage.init();
 });
-document.getElementById("lab").addEventListener("change", async () => {
-
-    window.currentLabId = document.getElementById("lab").value;
-    await Auth.loadAuthArea(window.currentLabId);
-    updateEntries();
-
-});
-
-document.getElementById("monthSelect").addEventListener("change", updateEntries);
-
-function updateEntries() {
-
-    const lab = document.getElementById("lab").value;
-    const monthValue = document.getElementById("monthSelect").value;
-
-    if (!monthValue || !lab) return;
-
-    const [year, month] = monthValue.split("-");
-
-    window.currentLabId = lab;
-    loadUserEntries(month, year);
-
-}
 </script>
-
 </body>
 </html>
