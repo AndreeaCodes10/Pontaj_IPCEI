@@ -25,6 +25,14 @@
 <body>
 
 <header class="topbar">
+    <div class="logos">
+        <a href ="https://www.upt.ro/">
+        <img src="{% static 'icons/alb.png' %}" alt="UPT" class="upt-icon">
+        </a> 
+        <a href ="https://mfe.gov.ro/">
+        <img src="{% static 'icons/mipe.png' %}" alt="MIPE" class="mipe-icon">
+        </a>
+    </div>
     <h1 class="app-title">Pontaj App</h1>
 
     <div id="authArea" class="auth-area">
@@ -96,10 +104,10 @@
                 </select>
             </div>
 
-           <div class="form-group inline-members">
+           <div class="form-group">
 
                 <label for="individual">Individual</label>
-
+                <div class="inline-members">
                 <select id="individual">
                     <option value="true">Da</option>
                     <option value="false">Nu</option>
@@ -109,7 +117,7 @@
                     <label>Selecteaza Membri</label>
                     <div id="members"></div>
                 </div>
-
+                </div>
             </div>
 
             <div class="row">
