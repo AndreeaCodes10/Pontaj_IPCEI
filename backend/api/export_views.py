@@ -24,6 +24,49 @@ def get_initials(user):
     last = user.last_name[:1].upper() if user.last_name else ""
     return f"{first}{last}"
 
+
+def autofit_sheet(ws):
+    """Adjust column widths and row heights based on cell content.
+    Skips merged cells except for the top-left cell of each merge range.
+    """
+    merged_starts = {(r.min_row, r.min_col): r for r in ws.merged_cells.ranges}
+
+    # columns
+    for col_cells in ws.columns:
+        max_len = 0
+        column = col_cells[0].column_letter
+        for cell in col_cells:
+            if cell.value is None:
+                continue
+            merged = merged_starts.get((cell.row, cell.column))
+            # only measure the top-left cell of a merge
+            if merged and (cell.row != merged.min_row or cell.column != merged.min_col):
+                continue
+            lines = str(cell.value).splitlines()
+            if not lines:
+                continue
+            raw_len = max((len(l) for l in lines))
+            # if the cell spans multiple cols, distribute width
+            colspan = 1
+            if merged:
+                colspan = merged.max_col - merged.min_col + 1
+            effective_len = (raw_len + colspan - 1) // colspan  # ceil division
+            max_len = max(max_len, effective_len)
+        ws.column_dimensions[column].width = max_len + 2
+
+    # rows
+    for row_cells in ws.iter_rows():
+        max_lines = 1
+        for cell in row_cells:
+            if cell.value is None:
+                continue
+            merged = merged_starts.get((cell.row, cell.column))
+            if merged and (cell.row != merged.min_row or cell.column != merged.min_col):
+                continue
+            lines = str(cell.value).splitlines()
+            max_lines = max(max_lines, len(lines))
+        ws.row_dimensions[row_cells[0].row].height = max_lines * 16
+
 def AG_workbook(lab, month, year):
 
     wb = Workbook()
@@ -72,22 +115,6 @@ def AG_workbook(lab, month, year):
         date__month=month
     )
 
-    # for e in entries:
-    #     ws.append([
-    #         e.user.username if e.user else "Anonymous",
-    #         e.lab.name,
-    #         e.subactivitate.nume,
-    #         e.livrabil,
-    #         "Da" if e.individual else "Nu",
-    #         ", ".join([u.username for u in e.members.all()]),
-    #         e.date.strftime("%d-%m-%Y"),
-    #         e.nr_ore,
-    #         e.durata,
-    #         e.activity_description,
-    #         e.comentarii,
-    #         e.links,
-    #     ])
-
     for e in entries:
         member_ids = set(e.members.values_list("id", flat=True))
         nume_utilizator = e.user.first_name+" "+e.user.last_name
@@ -115,15 +142,7 @@ def AG_workbook(lab, month, year):
         ]
         ws.append(row)
 
-    for col in ws.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                max_length = max(max_length, len(str(cell.value)))
-            except:
-                pass
-        ws.column_dimensions[column].width = max_length + 2
+    autofit_sheet(ws)
 
     for row in ws.iter_rows():
         for cell in row:
@@ -238,28 +257,8 @@ def upt_workbook(lab, users, month, year, director):
             for c in range(1, last_col+1):
                 ws.cell(row=r, column=c).border = thin_border
 
-        # Make columns auto width
-        merged_starts = {
-            (r.min_row, r.min_col): r
-            for r in ws.merged_cells.ranges
-        }
-
-        for col in range(1, ws.max_column + 1):
-            max_len = 0
-            for row_idx in range(1, ws.max_row + 1):
-
-                cell = ws.cell(row_idx, col)
-                if not cell.value:
-                    continue
-
-                # Skip merged cells spanning multiple columns
-                merged = merged_starts.get((row_idx, col))
-                if merged and merged.max_col > merged.min_col:
-                    continue
-
-                max_len = max(max_len, len(str(cell.value)))
-
-            ws.column_dimensions[get_column_letter(col)].width = max_len + 2
+        # auto‑size sheet
+        autofit_sheet(ws)
 
         final_row = row + 8
         ws.cell(row=final_row, column=1, value="Director/Responsabil Proiect Cercetare")
@@ -302,8 +301,10 @@ def mipe_workbook(lab, users, month, year, director):
         ws["B6"] = "Numele şi prenumele persoană"
         ws["B7"] = "CNP"
         ws["B8"] = "Funcția în Proiect¹"
-        ws["B9"] = "Corespondenta cu HG Nr. 1188/2022 (50/35/25/15 euro)/Corespodența cu plafonul prevăzut în Ghidul Solicitantului/corespondenta cu Legea 153/2017"
-        ws["B10"] = "Echivalent în lei a Limitei maxime în  euro/oră se calculează la cursul de schimb valutar comunicat de BNR pentru 1 euro la data semnării contractului de finanțare"
+        ws["B9"] = "Corespondenta cu HG Nr. 1188/2022 (50/35/25/15 euro)/Corespodența cu plafonul" \
+                    " prevăzut în Ghidul Solicitantului/corespondenta cu Legea 153/2017"
+        ws["B10"] = "Echivalent în lei a Limitei maxime în  euro/oră se calculează la cursul de " \
+                    "schimb valutar comunicat de BNR pentru 1 euro la data semnării contractului de finanțare"
         ws["B11"] = "Denumire Lider/Partener"
         for r in range(6,12):
             ws.merge_cells(start_row=r,start_column=2,end_row=r,end_column=5)
@@ -436,28 +437,8 @@ def mipe_workbook(lab, users, month, year, director):
             for c in range(2, total_col+1):
                 ws.cell(row=r, column=c).border = thin_border
 
-        # Make columns auto width
-        merged_starts = {
-            (r.min_row, r.min_col): r
-            for r in ws.merged_cells.ranges
-        }
-
-        for col in range(1, ws.max_column + 1):
-            max_len = 0
-            for row_idx in range(1, ws.max_row + 1):
-
-                cell = ws.cell(row_idx, col)
-                if not cell.value:
-                    continue
-
-                # Skip merged cells spanning multiple columns
-                merged = merged_starts.get((row_idx, col))
-                if merged and merged.max_col > merged.min_col:
-                    continue
-
-                max_len = max(max_len, len(str(cell.value)))
-
-            ws.column_dimensions[get_column_letter(col)].width = max_len + 2
+        # auto‑size columns and rows for this sheet
+        autofit_sheet(ws)
 
     return wb
 
@@ -598,28 +579,8 @@ def build_sumary_sheet(wb, users, year, month):
     ws.cell(row+5,4,"Coordonator achizitii si resursa umana,")
     ws.merge_cells(start_row=row+5,start_column=4,end_row=row+5,end_column=7)
 
-    # auto width
-    merged_starts = {
-        (r.min_row, r.min_col): r
-        for r in ws.merged_cells.ranges
-    }
-
-    for col in range(1, ws.max_column + 1):
-        max_len = 0
-        for row in range(1, ws.max_row + 1):
-
-            cell = ws.cell(row, col)
-            if not cell.value:
-                continue
-
-            # Skip merged cells spanning multiple columns
-            merged = merged_starts.get((row, col))
-            if merged and merged.max_col > merged.min_col:
-                continue
-
-            max_len = max(max_len, len(str(cell.value)))
-
-        ws.column_dimensions[get_column_letter(col)].width = max_len + 2
+    # auto‑size sheet
+    autofit_sheet(ws)
 
 
 def conti_workbook(lab, users, month, year, director):
@@ -778,28 +739,8 @@ def conti_workbook(lab, users, month, year, director):
         ws.cell(end+6,8,"Coordonator achizitii si resursa umana,")
         ws.merge_cells(start_row=end+6,start_column=8,end_row=end+6,end_column=11)
 
-        # auto width
-        merged_starts = {
-            (r.min_row, r.min_col): r
-            for r in ws.merged_cells.ranges
-        }
-
-        for col in range(1, ws.max_column + 1):
-            max_len = 0
-            for row in range(1, ws.max_row + 1):
-
-                cell = ws.cell(row, col)
-                if not cell.value:
-                    continue
-
-                # Skip merged cells spanning multiple columns
-                merged = merged_starts.get((row, col))
-                if merged and merged.max_col > merged.min_col:
-                    continue
-
-                max_len = max(max_len, len(str(cell.value)))
-
-            ws.column_dimensions[get_column_letter(col)].width = max_len + 2
+        # auto‑size sheet
+        autofit_sheet(ws)
 
     build_sumary_sheet(wb, users, year, month)
     return wb
