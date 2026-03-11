@@ -3,6 +3,9 @@ from django.urls import path
 from . import users_views
 from . import views
 from . import export_views
+# http://127.0.0.1:8000/api/login/
+# http://127.0.0.1:8000/api/app/
+# http://127.0.0.1:8000/api/entries/?lab=&month=3&year=2026
 
 urlpatterns = [
     path("app/", views.index, name="index"),
