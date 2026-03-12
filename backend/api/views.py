@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import Lab, LabMembership, Subactivitate, UserProfile, WorkEntry
+from .models import Lab, LabMembership, Activitate, UserProfile, WorkEntry
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.contrib.auth.models import User
@@ -195,8 +195,8 @@ def list_labs(request):
 #     return JsonResponse(data, safe=False)
 
 
-def list_subactivitati(request, lab_id):
-    subs = Subactivitate.objects.filter(lab_id=lab_id)
+def list_activitati(request, lab_id):
+    subs = Activitate.objects.filter(lab_id=lab_id)
     data = [{
         "id": s.id,
         "nume": s.nume,
@@ -252,9 +252,15 @@ def create_work_entry(request):
 
         new_hours = int(data["nr_ore"])
 
-        profile = user.userprofile
+        # Directors/members get per-lab limits via LabMembership. Admins may not have
+        # a LabMembership row, so fall back to their profile limit.
+        limit = (
+            membership.monthly_hour_limit
+            if membership is not None
+            else profile.monthly_hour_limit
+        )
 
-        if existing_hours + new_hours > membership.monthly_hour_limit:
+        if existing_hours + new_hours > limit:
             return JsonResponse(
                 {"error": "Monthly hour limit exceeded"},
                 status=400
@@ -302,7 +308,7 @@ def monthly_user_entries(request):
             "date": e.date.strftime("%d-%m-%Y"),
             "nr_ore": e.nr_ore,
             "lab": e.lab.name if e.lab else "",
-            "subactivitate": e.subactivitate.nume if e.subactivitate else "",
+            "activitate": e.activitate.nume if e.activitate else "",
             "livrabil": e.livrabil if e.livrabil else "N/A",
             "durata": e.durata,
             "activity_description": e.activity_description,

@@ -44,14 +44,13 @@ const Form = {
 
         const data = {
             lab: document.getElementById("lab").value,
-            subactivitate: document.getElementById("subactivitate").value,
+            activitate: document.getElementById("activitate").value,
             livrabil: document.getElementById("livrabil").value,
             individual: document.getElementById("individual").value,
             members: selectedMembers,
             date: formattedDate,
             durata: durata,
             nr_ore: nrOre,
-            activity_description: document.getElementById("activity_description").value,
             comentarii: document.getElementById("comentarii").value,
             links: document.getElementById("links").value,
         };

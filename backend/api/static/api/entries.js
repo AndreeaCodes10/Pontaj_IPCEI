@@ -1,18 +1,24 @@
 const Entries = {
+    entries: [],
+    sortDirections: {},
 
     async loadUserEntries(month, year) {
-
-        const res = await fetch(`/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`);
+        const res = await fetch(
+            `/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`
+        );
         const entries = await res.json();
+
+        this.entries = Array.isArray(entries) ? entries : [];
 
         const container = document.getElementById("userEntries");
         if (!container) return;
 
-        if (!entries.length) {
+        if (!this.entries.length) {
             container.innerHTML = "<p>No entries this month</p>";
             return;
         }
 
+        // Render the table shell once; sorting only re-renders <tbody>.
         container.innerHTML = `
             <div class="entries-table-container">
             <table class="entries-table">
@@ -22,7 +28,7 @@ const Entries = {
                     <th data-sort="nr_ore">Nr Ore</th>
                     <th data-sort="durata">Durata</th>
                     <th data-sort="lab">Lab</th>
-                    <th data-sort="subactivitate">Subactivitate</th>
+                    <th data-sort="activitate">Activitate</th>
                     <th data-sort="activity_description">Descriere</th>
                     <th data-sort="individual">Individual</th>
                     <th data-sort="livrabil">Livrabil</th>
@@ -31,72 +37,89 @@ const Entries = {
                     <th></th>
                     </tr>
                 </thead>
-                <tbody>
-                    ${entries.map(e => `
-                        <tr>
-                            <td>${e.date}</td>
-                            <td>${e.nr_ore}</td>
-                            <td>${e.durata}</td>
-                            <td>${e.lab}</td>
-                            <td>${e.subactivitate}</td>
-                            <td>${e.activity_description}</td>
-                            <td>${e.individual ? "Da" : "Nu"}</td>
-                            <td>${e.livrabil}</td>
-                            <td><a href="${e.links}" target="_blank">${e.links}</a></td>
-                            <td>${e.comentarii}</td>
-                            <td>
-                                <button data-id="${e.id}" class="delete-entry">✖</button>
-                            </td>
-                        </tr>
-                    `).join("")}
-                </tbody>
+                <tbody></tbody>
             </table>
             </div>
         `;
 
-        this.attachSorting(entries, month, year);
+        this.renderBody();
+        this.attachSorting();
         this.attachDelete();
     },
 
-    attachSorting(entries, month, year) {
+    parseDmyToMillis(dmy) {
+        // dmy expected: DD-MM-YYYY
+        const parts = String(dmy || "").split("-");
+        if (parts.length !== 3) return 0;
+        const dd = parseInt(parts[0], 10);
+        const mm = parseInt(parts[1], 10);
+        const yyyy = parseInt(parts[2], 10);
+        if (!yyyy || !mm || !dd) return 0;
+        return new Date(yyyy, mm - 1, dd).getTime();
+    },
 
-        let sortDirection = 1;
+    renderBody() {
+        const tbody = document.querySelector("#userEntries tbody");
+        if (!tbody) return;
 
+        tbody.innerHTML = this.entries.map(e => `
+            <tr>
+                <td>${e.date ?? ""}</td>
+                <td>${e.nr_ore ?? ""}</td>
+                <td>${e.durata ?? ""}</td>
+                <td>${e.lab ?? ""}</td>
+                <td>${e.activitate ?? ""}</td>
+                <td>${e.activity_description ?? ""}</td>
+                <td>${e.individual ? "Da" : "Nu"}</td>
+                <td>${e.livrabil ?? ""}</td>
+                <td>${e.links ? `<a href="${e.links}" target="_blank">${e.links}</a>` : ""}</td>
+                <td>${e.comentarii ?? ""}</td>
+                <td>
+                    <button data-id="${e.id}" class="delete-entry">x</button>
+                </td>
+            </tr>
+        `).join("");
+    },
+
+    attachSorting() {
         document.querySelectorAll("th[data-sort]").forEach(header => {
-
             header.onclick = () => {
-
                 const key = header.dataset.sort;
+                const dir = this.sortDirections[key] ? -this.sortDirections[key] : 1;
+                this.sortDirections[key] = dir;
 
-                entries.sort((a, b) => {
-
-                    let valA = a[key];
-                    let valB = b[key];
+                this.entries.sort((a, b) => {
+                    let valA = a?.[key];
+                    let valB = b?.[key];
 
                     if (key === "date") {
-                        valA = new Date(valA);
-                        valB = new Date(valB);
+                        valA = this.parseDmyToMillis(valA);
+                        valB = this.parseDmyToMillis(valB);
+                    } else if (key === "nr_ore") {
+                        valA = Number(valA ?? 0);
+                        valB = Number(valB ?? 0);
+                    } else if (key === "individual") {
+                        valA = valA ? 1 : 0;
+                        valB = valB ? 1 : 0;
+                    } else {
+                        valA = String(valA ?? "");
+                        valB = String(valB ?? "");
                     }
 
-                    if (valA > valB) return 1 * sortDirection;
-                    if (valA < valB) return -1 * sortDirection;
+                    if (valA > valB) return 1 * dir;
+                    if (valA < valB) return -1 * dir;
                     return 0;
                 });
 
-                sortDirection *= -1;
-
-                this.loadUserEntries(month, year);
+                this.renderBody();
+                this.attachDelete();
             };
-
         });
     },
 
     attachDelete() {
-
         document.querySelectorAll(".delete-entry").forEach(btn => {
-
             btn.onclick = async () => {
-
                 const id = btn.dataset.id;
 
                 if (!confirm("Ștergi această înregistrare?")) return;
@@ -124,5 +147,4 @@ const Entries = {
             .find(row => row.startsWith("csrftoken="))
             ?.split("=")[1];
     }
-
 };

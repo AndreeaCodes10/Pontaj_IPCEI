@@ -1,18 +1,23 @@
->> rmdir /s /q dataconnect
->> del firebase.json
->> del .firebaserc
->> del package.json
->> del package-lock.json
-Remove-Item : A positional parameter cannot be found that accepts argument '/q'.
-At line:1 char:1
-+ rmdir /s /q .github
-+ ~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidArgument: (:) [Remove-Item], ParameterBindingException
-    + FullyQualifiedErrorId : PositionalParameterNotFound,Microsoft.PowerShell.Commands.RemoveItemCommand
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 
-Remove-Item : A positional parameter cannot be found that accepts argument '/q'.
-At line:2 char:1
-+ rmdir /s /q dataconnect
-+ ~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidArgument: (:) [Remove-Item], ParameterBindingException
-    + FullyQualifiedErrorId : PositionalParameterNotFound,Microsoft.PowerShell.Commands.RemoveItemCommand
+.env
+.venv/
+venv/
+env/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+*.sqlite3
+*.log
+
+*.egg-info/
+dist/
+build/
+
+.DS_Store
+Thumbs.db

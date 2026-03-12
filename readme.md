@@ -28,8 +28,7 @@ Each lab has:
 ## **Work Entry System**
 Users can log their daily progress with detailed metadata:
 * **Entry Details**
-    * **Lab & Activitate** selection
-    * Sub-activity tracking
+    * **Lab** selection
     * Deliverable documentation
     * **Collaboration**
         * Individual/Collaborative flags to distinguish workflow types.

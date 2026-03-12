@@ -1,9 +1,9 @@
 from django.contrib import admin
-from .models import Lab, Subactivitate, WorkEntry, UserProfile , LabMembership
+from .models import Lab, WorkEntry, UserProfile , LabMembership, Activitate
 
 
-class SubactivitateInline(admin.TabularInline):
-    model = Subactivitate
+class ActivitateInline(admin.TabularInline):
+    model = Activitate
     extra = 1
 class LabMembershipInline(admin.TabularInline):
     model = LabMembership
@@ -25,11 +25,11 @@ class LabMembershipAdmin(admin.ModelAdmin):
 @admin.register(Lab)
 class LabAdmin(admin.ModelAdmin):
     list_display = ("name",)
-    inlines = [SubactivitateInline]
+    inlines = [ActivitateInline]
 
 
-@admin.register(Subactivitate)
-class SubactivitateAdmin(admin.ModelAdmin):
+@admin.register(Activitate)
+class ActivitateAdmin(admin.ModelAdmin):
     list_display = ("nume", "lab")
     search_fields = ("nume",)
 
@@ -39,7 +39,7 @@ class WorkEntryAdmin(admin.ModelAdmin):
     list_display = (
         "user",
         "lab",
-        "subactivitate",
+        "activitate",
         "individual",
         "date",
         "nr_ore",

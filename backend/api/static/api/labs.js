@@ -3,7 +3,8 @@ const Labs = {
     init() {
         this.labSelect = document.getElementById("lab");
         if (!this.labSelect) return;
-        this.subSelect = document.getElementById("subactivitate");
+        // Kept as "subSelect" to minimize downstream changes from the old subactivitate UI.
+        this.subSelect = document.getElementById("activitate");
         this.livrabilSelect = document.getElementById("livrabil");
         this.individualSelect = document.getElementById("individual");
 
@@ -38,7 +39,7 @@ const Labs = {
                 Members.loadAllUsers(labId);
             }
             Auth.loadAuthArea(labId); 
-            await this.loadSubactivitati(labId);
+            await this.loadActivitati(labId);
             Calendar.loadCalendarForLab(labId);
         });
 
@@ -47,12 +48,20 @@ const Labs = {
                 const selected = e.target.selectedOptions[0];
                 if (!selected) return;
 
-                if (this.livrabilSelect)
-                    this.livrabilSelect.value = selected.dataset.livrabil || "";
+                const descriereInput = document.getElementById("activity_description");
+                if (descriereInput) {
+                    descriereInput.value = selected.dataset.descriere || "";
+                }
 
-                if (this.individualSelect)
+                // Activitate no longer carries livrabil/individual; only set these if present.
+                if (this.livrabilSelect && selected.dataset.livrabil) {
+                    this.livrabilSelect.value = selected.dataset.livrabil;
+                }
+
+                if (this.individualSelect && selected.dataset.individual) {
                     this.individualSelect.value =
                         selected.dataset.individual === "true" ? "true" : "false";
+                }
             });
         }
 
@@ -71,18 +80,18 @@ const Labs = {
         }
     },
 
-    async loadSubactivitati(labId) {
-        const response = await fetch(`/api/subactivitati/${labId}/`);
+    async loadActivitati(labId) {
+        const response = await fetch(`/api/activitati/${labId}/`);
         const data = await response.json();
 
-        this.subSelect.innerHTML = "";
+        if (!this.subSelect) return;
+        this.subSelect.innerHTML = "<option value=''>Selecteaza activitate</option>";
 
         data.forEach(sub => {
             const option = document.createElement("option");
             option.value = sub.id;
             option.textContent = sub.nume;
-            option.dataset.livrabil = sub.livrabil;
-            option.dataset.individual = sub.individual;
+            option.dataset.descriere = sub.descriere || "";
             this.subSelect.appendChild(option);
         });
     }

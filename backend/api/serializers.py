@@ -1,7 +1,7 @@
 from datetime import datetime, date, time
 
 from rest_framework import serializers
-from .models import Lab, Subactivitate, WorkEntry
+from .models import Lab, WorkEntry
 
 
 class LabSerializer(serializers.ModelSerializer):
@@ -14,26 +14,8 @@ class LabSerializer(serializers.ModelSerializer):
     def get_display_name(self, obj):
         return obj.get_name_display()
 
-
-class SubactivitateSerializer(serializers.ModelSerializer):
-    display_name = serializers.SerializerMethodField()
-    display_livrabil = serializers.SerializerMethodField()
-    class Meta:
-        model = Subactivitate
-        fields = [
-            "id",
-            "lab",
-            "nume",
-            "descriere",
-            "display_name",
-            "display_livrabil"
-        ]
-
-    def get_display_name(self, obj):
-        return obj.nume()
-    
 class WorkEntrySerializer(serializers.ModelSerializer):
-    nr_ore = serializers.FloatField()
+    nr_ore = serializers.IntegerField()
 
     class Meta:
         model = WorkEntry
@@ -41,7 +23,7 @@ class WorkEntrySerializer(serializers.ModelSerializer):
             "id",
             "user",
             "lab",
-            "subactivitate",
+            "activitate",
             "livrabil",
             "individual",
             "date",
@@ -51,7 +33,9 @@ class WorkEntrySerializer(serializers.ModelSerializer):
             "comentarii",
             "links",
         ]
-        read_only_fields = ["user"]
+        # activity_description is derived from Activitate.descriere (admin-managed),
+        # not submitted by the user.
+        read_only_fields = ["user", "activity_description"]
 
     def validate(self, data):
         # ensure durata format HH:MM-HH:MM
@@ -60,9 +44,15 @@ class WorkEntrySerializer(serializers.ModelSerializer):
                 "Durata format invalid."
             )
 
-        if data["subactivitate"].lab != data["lab"]:
+        if data["activitate"].lab != data["lab"]:
             raise serializers.ValidationError(
-                "Subactivitate does not belong to selected Lab."
+                "Activitate does not belong to selected Lab."
             )
 
         return data
+
+    def create(self, validated_data):
+        activitate = validated_data.get("activitate")
+        if activitate is not None:
+            validated_data["activity_description"] = activitate.descriere or ""
+        return super().create(validated_data)

@@ -49,12 +49,12 @@ def create_profile(sender, instance, created, **kwargs):
         UserProfile.objects.create(user=instance)
 
     
-class Subactivitate(models.Model):
+class Activitate(models.Model):
 
     lab = models.ForeignKey(
         Lab,
         on_delete=models.CASCADE,
-        related_name="subactivitati"
+        related_name="activitati"
     )
 
     nume = models.CharField(max_length=100)
@@ -83,8 +83,8 @@ class WorkEntry(models.Model):
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
 
-    subactivitate = models.ForeignKey(
-        Subactivitate,
+    activitate = models.ForeignKey(
+        Activitate,
         on_delete=models.PROTECT
     )
 
@@ -111,6 +111,5 @@ class WorkEntry(models.Model):
         return (
             f"{self.user} | "
             f"{self.lab.name} | "
-            f"{self.subactivitate.nume} | "
             f"{self.date}"
         )
