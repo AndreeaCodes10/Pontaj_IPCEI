@@ -12,7 +12,13 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
-import backend.firebase
+
+# Firebase is optional in local/dev environments. If `firebase_admin` is not
+# installed, avoid failing Django startup (manage.py check/migrate/etc.).
+try:
+    import backend.firebase  # noqa: F401
+except ModuleNotFoundError:
+    pass
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,6 +39,13 @@ ALLOWED_HOSTS = ['*']
 
 # Application definition
 
+def _optional_app(module_name: str) -> list[str]:
+    try:
+        __import__(module_name)
+        return [module_name]
+    except ModuleNotFoundError:
+        return []
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -40,7 +53,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django_extensions",
+    *_optional_app("django_extensions"),
     "corsheaders",
     "rest_framework",
 

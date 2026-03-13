@@ -23,6 +23,7 @@ urlpatterns = [
     path("export-monthly-sheet/", export_views.export_excel, name="export-excel"),
     # path("export-monthly-sheet/", export_views.export_work_entries_excel, name="export-work-entries-excel"),
     path("monthly-user-entries/", views.monthly_user_entries, name="monthly-user-entries"),
+    path("generate-jurnal-docx/", views.generate_jurnal_docx, name="generate-jurnal-docx"),
     path("work-entry/<int:entry_id>/", views.delete_work_entry, name="delete-work-entry"),
 
     path("labs/<int:lab_id>/members/", users_views.lab_members),

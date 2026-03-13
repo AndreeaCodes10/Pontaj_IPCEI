@@ -22,6 +22,7 @@ from collections import defaultdict
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font
 from openpyxl.styles.borders import Border, Side
+from io import BytesIO
 
 
 @csrf_exempt
@@ -225,6 +226,7 @@ def create_work_entry(request):
         can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
         if not can_see_jurnal or str(lab_id) != "2":
             data.pop("jurnal", None)
+            data.pop("scurta_descriere_jurnal", None)
 
         nr_ore = data.get("nr_ore")
         durata = data.get("durata")
@@ -248,6 +250,14 @@ def create_work_entry(request):
                 {"error": "User not enrolled in this lab"},
                 status=403
             )
+
+        can_edit_monthly = profile.role == "admin" or (
+            membership is not None and membership.role == "director"
+        )
+        if not can_edit_monthly:
+            data["links"] = ""
+            data["livrabil"] = ""
+            data["comentarii"] = ""
 
         date_obj = datetime.strptime(data["date"], "%Y-%m-%d")
         month = date_obj.month
@@ -328,12 +338,144 @@ def monthly_user_entries(request):
             "members": [u.username for u in e.members.all()],
             "links": e.links,
             "comentarii": e.comentarii,
-            **({"jurnal": e.jurnal or ""} if (can_see_jurnal and str(lab_id) == "2") else {}),
+            **(
+                {
+                    "jurnal": e.jurnal or "",
+                    "scurta_descriere_jurnal": e.scurta_descriere_jurnal or "",
+                }
+                if (can_see_jurnal and str(lab_id) == "2")
+                else {}
+            ),
         }
         for e in entries
     ]
 
     return JsonResponse(data, safe=False)
+
+
+@login_required
+def generate_jurnal_docx(request):
+    """
+    Generate a .docx journal for the logged-in user using their own entries.
+    Visibility: only users who can see Jurnal for Lab 2.
+    """
+    lab_id = request.GET.get("lab")
+    month = request.GET.get("month")
+    year = request.GET.get("year")
+
+    try:
+        month = int(month)
+        year = int(year)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid month/year"}, status=400)
+
+    profile = request.user.userprofile
+    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
+    if not can_see_jurnal or str(lab_id) != "2":
+        return HttpResponseForbidden("Nu ai acces la jurnal pentru acest lab.")
+
+    try:
+        from docx import Document  # type: ignore
+        from docx.oxml import OxmlElement  # type: ignore
+        from docx.oxml.ns import qn  # type: ignore
+        from docx.opc.constants import RELATIONSHIP_TYPE as RT  # type: ignore
+        from docx.shared import Inches, RGBColor  # type: ignore
+        from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+    except ModuleNotFoundError:
+        return JsonResponse(
+            {"error": "Missing dependency: python-docx. Install it and retry."},
+            status=500,
+        )
+
+    def set_document_font_times_new_roman(document):
+        style = document.styles["Normal"]
+        font = style.font
+        font.name = "Times New Roman"
+        # Ensure the font applies to all script types as well.
+        rfonts = style.element.rPr.rFonts
+        rfonts.set(qn("w:ascii"), "Times New Roman")
+        rfonts.set(qn("w:hAnsi"), "Times New Roman")
+        rfonts.set(qn("w:cs"), "Times New Roman")
+        rfonts.set(qn("w:eastAsia"), "Times New Roman")
+
+    def add_hyperlink(paragraph, url, text):
+        # python-docx doesn't expose hyperlinks directly; construct the XML.
+        part = paragraph.part
+        r_id = part.relate_to(url, RT.HYPERLINK, is_external=True)
+
+        hyperlink = OxmlElement("w:hyperlink")
+        hyperlink.set(qn("r:id"), r_id)
+
+        run = OxmlElement("w:r")
+        r_pr = OxmlElement("w:rPr")
+
+        # Black, underlined link (Word default look, but explicit).
+        color = OxmlElement("w:color")
+        color.set(qn("w:val"), "0000FF")
+        r_pr.append(color)
+
+        u = OxmlElement("w:u")
+        u.set(qn("w:val"), "single")
+        r_pr.append(u)
+
+        run.append(r_pr)
+        t = OxmlElement("w:t")
+        t.text = text
+        run.append(t)
+        hyperlink.append(run)
+
+        paragraph._p.append(hyperlink)
+
+    entries = (
+        WorkEntry.objects.filter(
+            user=request.user,
+            lab_id=lab_id,
+            date__month=month,
+            date__year=year,
+        )
+        .order_by("date")
+    )
+
+    doc = Document()
+    set_document_font_times_new_roman(doc)
+
+    for e in entries:
+        date_str = e.date.strftime("%d-%m-%Y")
+        durata_str = (e.durata or "").strip()
+
+        line2 = (e.scurta_descriere_jurnal or "").strip()
+        jurnal_value = (e.jurnal or "").strip()
+
+        p1 = doc.add_paragraph()
+        p1.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r1 = p1.add_run(f"{date_str} {durata_str}".strip())
+        r1.bold = True
+        r1.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
+
+        if line2:
+            p2 = doc.add_paragraph()
+            p2.add_run(line2)
+
+        p3 = doc.add_paragraph()
+        p3.add_run("link to my drive: ")
+        if jurnal_value.startswith("http://") or jurnal_value.startswith("https://"):
+            add_hyperlink(p3, jurnal_value, jurnal_value)
+        else:
+            p3.add_run(jurnal_value)
+
+        doc.add_paragraph("")  # spacer
+
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+
+    filename = f"jurnal_lab{lab_id}_{year}-{month:02d}_{request.user.username}.docx"
+    resp = HttpResponse(
+        buf.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
 
 
 @login_required

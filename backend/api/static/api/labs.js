@@ -8,6 +8,8 @@ const Labs = {
         this.livrabilSelect = document.getElementById("livrabil");
         this.individualSelect = document.getElementById("individual");
         this.jurnalGroup = document.getElementById("jurnalGroup");
+        this.scurtaDescriereJurnalGroup = document.getElementById("scurtaDescriereJurnalGroup");
+        this.generatedJurnalGroup = document.getElementById("generatedJurnalGroup");
 
         this.loadLabs();
         this.attachEvents();
@@ -41,7 +43,16 @@ const Labs = {
                 this.jurnalGroup.style.display =
                     window.canSeeJurnal && String(labId) === "2" ? "block" : "none";
             }
+            if (this.scurtaDescriereJurnalGroup) {
+                this.scurtaDescriereJurnalGroup.style.display =
+                    window.canSeeJurnal && String(labId) === "2" ? "block" : "none";
+            }
+            if (this.generatedJurnalGroup) {
+                this.generatedJurnalGroup.style.display =
+                    window.canSeeJurnal && String(labId) === "2" ? "block" : "none";
+            }
             Members.applyLabPermissions(user);
+            Form.applyPermissions(user);
             Members.loadLabMembers(labId);
             if (user.global_role === "admin" || user.lab_role === "director") {
                 // loadLabMembers(labId);

@@ -12,12 +12,22 @@
 # initialize_app(cred)
 
 import os
-import firebase_admin
-from firebase_admin import credentials
+
+try:
+    import firebase_admin
+    from firebase_admin import credentials
+except ModuleNotFoundError:
+    # Firebase is optional for local/dev. When `firebase_admin` isn't installed,
+    # keep this module importable so Django can start (checks/migrations/etc.).
+    firebase_admin = None
+    credentials = None
 
 FIREBASE_KEY_PATH = os.getenv("FIREBASE_KEY_PATH")
 
-if FIREBASE_KEY_PATH:
+if firebase_admin is None:
+    # Firebase not available (dependency not installed)
+    pass
+elif FIREBASE_KEY_PATH:
     cred = credentials.Certificate(FIREBASE_KEY_PATH)
     firebase_admin.initialize_app(cred)
 else:

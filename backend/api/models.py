@@ -59,6 +59,9 @@ class Activitate(models.Model):
 
     nume = models.CharField(max_length=100)
 
+    # Admin-maintained "summary name" used in exports.
+    denumire_activitate = models.TextField(blank=True, default="")
+
     # This is template-level description (multiple allowed per subactivity)
     descriere = models.TextField(blank=True)
 
@@ -83,6 +86,7 @@ class WorkEntry(models.Model):
     # Common fields
     livrabil = models.TextField(blank=True, default="")
     jurnal = models.TextField(blank=True, default="")
+    scurta_descriere_jurnal = models.TextField(blank=True, default="")
     individual = models.BooleanField(default=False)
     members = models.ManyToManyField(User, blank=True, related_name="shared_entries")
 

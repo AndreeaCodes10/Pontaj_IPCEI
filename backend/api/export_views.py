@@ -30,20 +30,34 @@ def autofit_sheet(ws):
     """
     merged_starts = {(r.min_row, r.min_col): r for r in ws.merged_cells.ranges}
 
-    # columns
+    min_width = 8
+    max_width = 55
+    padding = 2
+
+    wrap_columns = set()
+    computed_widths = {}
+
+    # columns (approximate "autofit" + clamp so long text doesn't explode layout)
     for col_cells in ws.columns:
         max_len = 0
+        has_newlines = False
         column = col_cells[0].column_letter
+
         for cell in col_cells:
             if cell.value is None:
                 continue
+
             merged = merged_starts.get((cell.row, cell.column))
             # only measure the top-left cell of a merge
             if merged and (cell.row != merged.min_row or cell.column != merged.min_col):
                 continue
-            lines = str(cell.value).splitlines()
+
+            text = str(cell.value)
+            lines = text.splitlines()
+            has_newlines = has_newlines or (len(lines) > 1)
             if not lines:
                 continue
+
             raw_len = max((len(l) for l in lines))
             # if the cell spans multiple cols, distribute width
             colspan = 1
@@ -51,7 +65,27 @@ def autofit_sheet(ws):
                 colspan = merged.max_col - merged.min_col + 1
             effective_len = (raw_len + colspan - 1) // colspan  # ceil division
             max_len = max(max_len, effective_len)
-        ws.column_dimensions[column].width = max_len + 2
+
+        width = max_len + padding
+        if width > max_width:
+            wrap_columns.add(column)
+        if has_newlines:
+            wrap_columns.add(column)
+
+        width = max(min_width, min(max_width, width))
+        computed_widths[column] = width
+        ws.column_dimensions[column].width = width
+
+    # Enable wrapping for columns that contain long/multiline values.
+    if wrap_columns:
+        for column in wrap_columns:
+            for cell in ws[column]:
+                if cell.value is None:
+                    continue
+                merged = merged_starts.get((cell.row, cell.column))
+                if merged and (cell.row != merged.min_row or cell.column != merged.min_col):
+                    continue
+                cell.alignment = cell.alignment.copy(wrap_text=True)
 
     # rows
     for row_cells in ws.iter_rows():
@@ -62,9 +96,29 @@ def autofit_sheet(ws):
             merged = merged_starts.get((cell.row, cell.column))
             if merged and (cell.row != merged.min_row or cell.column != merged.min_col):
                 continue
-            lines = str(cell.value).splitlines()
-            max_lines = max(max_lines, len(lines))
-        ws.row_dimensions[row_cells[0].row].height = max_lines * 16
+            text = str(cell.value)
+            lines = text.splitlines() or [""]
+
+            line_count = len(lines)
+            column_letter = cell.column_letter
+            if column_letter in wrap_columns and line_count == 1:
+                # Roughly estimate wrapped lines from current column width.
+                merged_width = computed_widths.get(column_letter, max_width)
+                if merged:
+                    # Sum widths across spanned columns (approx).
+                    merged_width = 0
+                    for col in range(merged.min_col, merged.max_col + 1):
+                        letter = ws.cell(row=1, column=col).column_letter
+                        merged_width += computed_widths.get(letter, max_width)
+
+                chars_per_line = max(1, int(merged_width))
+                est = (len(lines[0]) + chars_per_line - 1) // chars_per_line
+                line_count = max(line_count, est)
+
+            max_lines = max(max_lines, line_count)
+
+        # Clamp to avoid extreme heights from very long text.
+        ws.row_dimensions[row_cells[0].row].height = min(220, max_lines * 16)
 
 
 LAB_JURNAL_ID = 2
@@ -602,7 +656,7 @@ def build_sumary_sheet(wb, users, year, month, lab):
     autofit_sheet(ws)
 
 
-def conti_workbook(lab, users, month, year, director, show_jurnal=False):
+def conti_workbook(lab, users, month, year, director):
 
     days = calendar.monthrange(year, month)[1]
     month_name = months_to_RO(month)
@@ -622,14 +676,15 @@ def conti_workbook(lab, users, month, year, director, show_jurnal=False):
 
         # ---------------- HEADER ----------------
         ws["A1"] = "Info:"
-        ws["B1"] = "Activitati de cercetare fundamentala in cadrul "
-        ws["A2"] = "Ceva titlu"
+        ws["B1"] = f"Activitati de cercetare fundamentala in cadrul {lab}"
+        ws["A2"] = "Metode avansate de proiectare în vederea reducerii puterii disipate în circuitele mixte analog-digitale și arhitecturi RISC-V"
         ws.merge_cells(start_row=2,start_column=1,end_row=2,end_column=2)
         ws["A3"] = "PI:"
         ws["B3"] = "Universitatea Politehnica Timisoara"
         ws["A4"] = "Traductoare inteligente eficiente din punct de vedere energetic pentru sisteme auto  – inovație de-a lungul lanțului valoric (ASSET-IxC - UPT) "
         ws.merge_cells(start_row=4,start_column=1,end_row=4,end_column=2)
         ws["A5"] = "NR:"
+        ws["B5"] = "5.PI/I4/C9"
 
         ws["A7"] = "PONTAJ INDIVIDUAL PENTRU LUNA/ANUL:"
         ws["B7"] = f"{month_name}/{year}"
@@ -643,6 +698,7 @@ def conti_workbook(lab, users, month, year, director, show_jurnal=False):
         # Thin borders for the small header blocks
         apply_border(ws, 1, 1, 5, 2, thickness="thin")   # A1:B5
         apply_border(ws, 7, 1, 8, 2, thickness="thin")   # A7:B8
+        apply_border(ws, 10, 1, 10, 2, thickness="thin") # A10
 
         # ------------- ACTIVITIES TABLE -------------
         start = 12
@@ -652,13 +708,9 @@ def conti_workbook(lab, users, month, year, director, show_jurnal=False):
         ws.cell(start,3,"Scurta descriere activitate")
         ws.cell(start,4,"Link")
         ws.cell(start,5,"Livrabile")
-        if show_jurnal:
-            ws.cell(start,6,"Jurnal")
-            ws.cell(start,7,"Mapare activitate partener direct")
-            ws.cell(start,8,"Comentarii/Scurta descriere actiuni cercetare")
-        else:
-            ws.cell(start,6,"Mapare activitate partener direct")
-            ws.cell(start,7,"Comentarii/Scurta descriere actiuni cercetare")
+
+        ws.cell(start,6,"Mapare activitate partener direct")
+        ws.cell(start,7,"Comentarii/Scurta descriere actiuni cercetare")
 
         nr_Activitati = 4
         activitati = list(lab.activitati.all().order_by("id")[:nr_Activitati])
@@ -674,7 +726,6 @@ def conti_workbook(lab, users, month, year, director, show_jurnal=False):
 
         links_by_act = defaultdict(list)
         livrabile_by_act = defaultdict(list)
-        jurnal_by_act = defaultdict(list)
         comentarii_by_act = defaultdict(list)
 
         for e in entries:
@@ -688,9 +739,6 @@ def conti_workbook(lab, users, month, year, director, show_jurnal=False):
             if e.livrabil:
                 livrabile_by_act[act_id].append(str(e.livrabil).strip())
 
-            if show_jurnal and getattr(e, "jurnal", ""):
-                jurnal_by_act[act_id].append(str(e.jurnal).strip())
-
             if e.comentarii:
                 comentarii_by_act[act_id].append(str(e.comentarii).strip())
 
@@ -701,7 +749,7 @@ def conti_workbook(lab, users, month, year, director, show_jurnal=False):
         # Fill the activity description block from admin-maintained Activitate.descriere.
         for i, act in enumerate(activitati):
             r = start + 1 + i
-            ws.cell(r, 2, act.nume)
+            ws.cell(r, 2, (act.denumire_activitate or "").strip() or act.nume)
             ws.cell(r, 3, act.descriere)
 
             act_id = act.id
@@ -723,15 +771,6 @@ def conti_workbook(lab, users, month, year, director, show_jurnal=False):
                     livrabile.append(v)
             ws.cell(r, 5, "\n".join(livrabile))
 
-            if show_jurnal:
-                seen_jurnal = set()
-                jurnal_values = []
-                for v in jurnal_by_act.get(act_id, []):
-                    if v and v not in seen_jurnal:
-                        seen_jurnal.add(v)
-                        jurnal_values.append(v)
-                ws.cell(r, 6, "\n".join(jurnal_values))
-
             # Comentarii (from WorkEntry.comentarii)
             seen_comments = set()
             comments = []
@@ -739,12 +778,12 @@ def conti_workbook(lab, users, month, year, director, show_jurnal=False):
                 if v and v not in seen_comments:
                     seen_comments.add(v)
                     comments.append(v)
-            comments_col = 8 if show_jurnal else 7
+            comments_col = 7
             ws.cell(r, comments_col, "\n".join(comments))
 
         # Thin borders for the activitati block
         activitati_end_row = start + nr_Activitati
-        last_activitati_col = 8 if show_jurnal else 7
+        last_activitati_col = 7
         apply_border(ws, start, 1, activitati_end_row, last_activitati_col, thickness="thin")
 
         # ------------- DAILY TABLE -------------
@@ -885,7 +924,7 @@ def export_excel(request):
 
     wb_AG = AG_workbook(lab, month, year, show_jurnal=show_jurnal) if include_ag else None
     wb_upt = upt_workbook(lab,users,month,year,request.user)
-    wb_conti = conti_workbook(lab, users, month, year, request.user, show_jurnal=show_jurnal)
+    wb_conti = conti_workbook(lab, users, month, year, request.user)
     wb_mipe =mipe_workbook(lab,users,month,year,request.user)
 
     AG_buffer = BytesIO() if wb_AG is not None else None

@@ -89,6 +89,11 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
 
         <form id="workEntryForm">
 
+            <div class="form-section" id="dailySection">
+                <div class="form-section-header">
+                    <h3>Zilnic</h3>
+                </div>
+
             <div class="form-group">
                 <label for="lab">Lab</label>
                 <select id="lab"></select>
@@ -98,18 +103,6 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
                 <label for="activitate">Activitate</label>
                 <select id="activitate"></select>
             </div>
-
-            <div class="form-group">
-                <label for="livrabil">Livrabil</label>
-                <textarea id="livrabil" placeholder="Livrabil..."></textarea>
-            </div>
-
-            {% if can_see_jurnal %}
-            <div class="form-group" id="jurnalGroup" style="display:none;">
-                <label for="jurnal">Jurnal</label>
-                <textarea id="jurnal" placeholder="Jurnal..."></textarea>
-            </div>
-            {% endif %}
 
            <div class="form-group">
 
@@ -139,7 +132,7 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
                 </div>
 
                 <div class="form-group">
-                    <label>Nr. ore</label>
+                    <label for="nr_ore">Nr. ore</label>
                     <input type="number" id="nr_ore" min="1" step="1" required>
                 </div>
             </div>
@@ -148,13 +141,48 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
                 <label for="activity_description">Descriere</label>
                 <input type="text" id="activity_description" placeholder="Descriere activitate..." readonly>
             </div>
-            <div class="form-group">
-                <label for="links">Links</label>
-                <textarea id="links" placeholder="GitHub, Drive, etc."></textarea>
+            {% if can_see_jurnal %}
+            <div class="form-group" id="jurnalGroup" style="display:none;">
+                <label for="jurnal">Link la Jurnal</label>
+                <textarea id="jurnal" placeholder="Jurnal..."></textarea>
             </div>
-            <div class="form-group">
+
+            <div class="form-group" id="scurtaDescriereJurnalGroup" style="display:none;">
+                <label for="scurta_descriere_jurnal">Scurta Descriere Jurnal</label>
+                <textarea id="scurta_descriere_jurnal" placeholder="Scurta descriere..."></textarea>
+            </div>
+
+            <div class="form-group" id="generatedJurnalGroup" style="display:none;">
+                <label for="jurnalMonth">Luna Jurnal</label>
+                <div class="inline-month-actions">
+                    <input type="month" id="jurnalMonth">
+                    <button type="button" id="generateJurnalBtn" class="btn-secondary">Genereaza Jurnal (Word)</button>
+                </div>
+            </div>
+            {% endif %}
+
+            </div>
+
+            <div class="form-section" id="monthlySection" style="display:none;">
+                <div class="form-section-header">
+                    <h3>Lunar</h3>
+                </div>
+
+            <div class="form-group" id="linksGroup">
+                <label for="links">Links</label>
+                <textarea id="links" placeholder="Link spre Working"></textarea>
+            </div>
+
+            <div class="form-group" id="livrabilGroup">
+                <label for="livrabil">Livrabil</label>
+                <textarea id="livrabil" placeholder="Link spre Livrabil"></textarea>
+            </div>
+
+            <div class="form-group" id="comentariiGroup">
                 <label for="comentarii">Comentarii</label>
                 <textarea id="comentarii" placeholder="Observații..."></textarea>
+            </div>
+
             </div>
         <input type="hidden" id="total_hours">
         <div class="actions">

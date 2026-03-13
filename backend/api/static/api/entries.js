@@ -7,6 +7,34 @@ const Entries = {
         return v ? `<a href="${v}" target="_blank">${v}</a>` : "";
     },
 
+    renderColGroup(showJurnal) {
+        const cols = showJurnal
+            ? [
+                { w: "8%" },  // Data
+                { w: "6%" },  // Nr Ore
+                { w: "8%" },  // Durata
+                { w: "6%" },  // Lab
+                { w: "18%" }, // Activitate
+                { w: "20%" }, // Descriere
+                { w: "8%" },  // Individual
+                { w: "12%" }, // Jurnal
+                { w: "12%" }, // Descriere jurnal
+                { w: "2%" },  // Delete
+            ]
+            : [
+                { w: "10%" }, // Data
+                { w: "8%" },  // Nr Ore
+                { w: "10%" }, // Durata
+                { w: "8%" },  // Lab
+                { w: "22%" }, // Activitate
+                { w: "30%" }, // Descriere
+                { w: "8%" },  // Individual
+                { w: "4%" },  // Delete
+            ];
+
+        return `<colgroup>${cols.map(c => `<col style="width:${c.w}">`).join("")}</colgroup>`;
+    },
+
     async loadUserEntries(month, year) {
         const res = await fetch(
             `/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`
@@ -28,6 +56,7 @@ const Entries = {
         container.innerHTML = `
             <div class="entries-table-container">
             <table class="entries-table">
+                ${this.renderColGroup(showJurnal)}
                 <thead>
                     <tr>
                     <th data-sort="date">Data</th>
@@ -37,10 +66,11 @@ const Entries = {
                     <th data-sort="activitate">Activitate</th>
                     <th data-sort="activity_description">Descriere</th>
                     <th data-sort="individual">Individual</th>
-                    <th data-sort="livrabil">Livrabil</th>
-                    ${showJurnal ? `<th data-sort="jurnal">Jurnal</th>` : ""}
-                    <th data-sort="links">Links</th>
-                    <th data-sort="comentarii">Comentarii</th>
+                    ${
+                        showJurnal
+                            ? `<th data-sort="jurnal">Jurnal</th><th data-sort="scurta_descriere_jurnal">Descriere jurnal</th>`
+                            : ""
+                    }
                     <th></th>
                     </tr>
                 </thead>
@@ -79,10 +109,11 @@ const Entries = {
                 <td>${e.activitate ?? ""}</td>
                 <td>${e.activity_description ?? ""}</td>
                 <td>${e.individual ? "Da" : "Nu"}</td>
-                <td>${this.renderLinkCell(e.livrabil)}</td>
-                ${showJurnal ? `<td>${this.renderLinkCell(e.jurnal)}</td>` : ""}
-                <td>${this.renderLinkCell(e.links)}</td>
-                <td>${e.comentarii ?? ""}</td>
+                ${
+                    showJurnal
+                        ? `<td>${this.renderLinkCell(e.jurnal)}</td><td>${e.scurta_descriere_jurnal ?? ""}</td>`
+                        : ""
+                }
                 <td>
                     <button data-id="${e.id}" class="delete-entry">x</button>
                 </td>
