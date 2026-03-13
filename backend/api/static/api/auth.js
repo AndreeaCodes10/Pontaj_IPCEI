@@ -37,6 +37,10 @@ const Auth = {
         .then(res => res.json())
         .then(user => {
 
+            if (typeof user?.can_see_jurnal !== "undefined") {
+                window.canSeeJurnal = !!user.can_see_jurnal;
+            }
+
             const usernameEl = document.getElementById("authUser");
             const roleEl = document.getElementById("authRole");
             const logoutBtn = document.getElementById("logoutBtn");

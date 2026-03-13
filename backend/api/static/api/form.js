@@ -55,6 +55,11 @@ const Form = {
             links: document.getElementById("links").value,
         };
 
+        const jurnalEl = document.getElementById("jurnal");
+        if (jurnalEl) {
+            data.jurnal = jurnalEl.value;
+        }
+
         const response = await fetch("/api/work-entry/", {
             method: "POST",
             credentials: "same-origin",

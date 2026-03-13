@@ -145,6 +145,7 @@ def current_user(request):
     lab_id = request.GET.get("lab")
 
     lab_role = None
+    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
 
     if lab_id:
         try:
@@ -159,17 +160,22 @@ def current_user(request):
     return JsonResponse({
         "username": request.user.username,
         "global_role": profile.role,
-        "lab_role": lab_role
+        "lab_role": lab_role,
+        "can_see_jurnal": can_see_jurnal,
     })
 
 
 @login_required
 def index(request):
-    return render(request, "api/index.html")
+    profile = request.user.userprofile
+    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
+    return render(request, "api/index.html", {"can_see_jurnal": can_see_jurnal})
 
 @login_required
 def entries_page(request):
-    return render(request, "api/entries.html")
+    profile = request.user.userprofile
+    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
+    return render(request, "api/entries.html", {"can_see_jurnal": can_see_jurnal})
 
 def get_visible_labs(user):
     '''Helper function to get labs visible to the user based on their role. Admin sees all, director sees their labs, member sees their labs.'''
@@ -215,6 +221,10 @@ def create_work_entry(request):
         user = request.user
         profile = user.userprofile
         lab_id = data.get("lab")
+
+        can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
+        if not can_see_jurnal or str(lab_id) != "2":
+            data.pop("jurnal", None)
 
         nr_ore = data.get("nr_ore")
         durata = data.get("durata")
@@ -294,6 +304,8 @@ def monthly_user_entries(request):
         return JsonResponse({"error": "Invalid month/year"}, status=400)
     
     lab_id = request.GET.get("lab")
+    profile = request.user.userprofile
+    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
 
     entries = WorkEntry.objects.filter(
         user=request.user,
@@ -309,13 +321,14 @@ def monthly_user_entries(request):
             "nr_ore": e.nr_ore,
             "lab": e.lab.name if e.lab else "",
             "activitate": e.activitate.nume if e.activitate else "",
-            "livrabil": e.livrabil if e.livrabil else "N/A",
+            "livrabil": e.livrabil or "",
             "durata": e.durata,
             "activity_description": e.activity_description,
             "individual": e.individual,
             "members": [u.username for u in e.members.all()],
             "links": e.links,
             "comentarii": e.comentarii,
+            **({"jurnal": e.jurnal or ""} if (can_see_jurnal and str(lab_id) == "2") else {}),
         }
         for e in entries
     ]

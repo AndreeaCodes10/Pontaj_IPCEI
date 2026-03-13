@@ -7,6 +7,7 @@ const Labs = {
         this.subSelect = document.getElementById("activitate");
         this.livrabilSelect = document.getElementById("livrabil");
         this.individualSelect = document.getElementById("individual");
+        this.jurnalGroup = document.getElementById("jurnalGroup");
 
         this.loadLabs();
         this.attachEvents();
@@ -32,6 +33,14 @@ const Labs = {
             window.currentLabId = labId;
             if (!labId) return;
             const user = await Auth.getCurrentUser(labId);
+            if (typeof user?.can_see_jurnal !== "undefined") {
+                window.canSeeJurnal = !!user.can_see_jurnal;
+            }
+
+            if (this.jurnalGroup) {
+                this.jurnalGroup.style.display =
+                    window.canSeeJurnal && String(labId) === "2" ? "block" : "none";
+            }
             Members.applyLabPermissions(user);
             Members.loadLabMembers(labId);
             if (user.global_role === "admin" || user.lab_role === "director") {

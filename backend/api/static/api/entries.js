@@ -2,6 +2,11 @@ const Entries = {
     entries: [],
     sortDirections: {},
 
+    renderLinkCell(value) {
+        const v = (value ?? "").toString();
+        return v ? `<a href="${v}" target="_blank">${v}</a>` : "";
+    },
+
     async loadUserEntries(month, year) {
         const res = await fetch(
             `/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`
@@ -19,6 +24,7 @@ const Entries = {
         }
 
         // Render the table shell once; sorting only re-renders <tbody>.
+        const showJurnal = !!window.canSeeJurnal && String(window.currentLabId) === "2";
         container.innerHTML = `
             <div class="entries-table-container">
             <table class="entries-table">
@@ -32,6 +38,7 @@ const Entries = {
                     <th data-sort="activity_description">Descriere</th>
                     <th data-sort="individual">Individual</th>
                     <th data-sort="livrabil">Livrabil</th>
+                    ${showJurnal ? `<th data-sort="jurnal">Jurnal</th>` : ""}
                     <th data-sort="links">Links</th>
                     <th data-sort="comentarii">Comentarii</th>
                     <th></th>
@@ -61,6 +68,7 @@ const Entries = {
     renderBody() {
         const tbody = document.querySelector("#userEntries tbody");
         if (!tbody) return;
+        const showJurnal = !!window.canSeeJurnal && String(window.currentLabId) === "2";
 
         tbody.innerHTML = this.entries.map(e => `
             <tr>
@@ -71,8 +79,9 @@ const Entries = {
                 <td>${e.activitate ?? ""}</td>
                 <td>${e.activity_description ?? ""}</td>
                 <td>${e.individual ? "Da" : "Nu"}</td>
-                <td>${e.livrabil ?? ""}</td>
-                <td>${e.links ? `<a href="${e.links}" target="_blank">${e.links}</a>` : ""}</td>
+                <td>${this.renderLinkCell(e.livrabil)}</td>
+                ${showJurnal ? `<td>${this.renderLinkCell(e.jurnal)}</td>` : ""}
+                <td>${this.renderLinkCell(e.links)}</td>
                 <td>${e.comentarii ?? ""}</td>
                 <td>
                     <button data-id="${e.id}" class="delete-entry">x</button>

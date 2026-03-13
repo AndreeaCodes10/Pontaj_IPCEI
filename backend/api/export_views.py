@@ -5,10 +5,10 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side 
-from .models import Lab, LabMembership, User, WorkEntry, Activitate
+from .models import Lab, LabMembership, User, WorkEntry
+from .excel_utils import apply_border
 import zipfile
 from io import BytesIO
-from openpyxl.utils import get_column_letter
 from collections import defaultdict
 from openpyxl.comments import Comment
 
@@ -66,7 +66,17 @@ def autofit_sheet(ws):
             max_lines = max(max_lines, len(lines))
         ws.row_dimensions[row_cells[0].row].height = max_lines * 16
 
-def AG_workbook(lab, month, year):
+
+LAB_JURNAL_ID = 2
+
+
+def should_show_jurnal_field(profile):
+    if not profile:
+        return False
+    return LabMembership.objects.filter(lab_id=LAB_JURNAL_ID, profile=profile).exists()
+
+
+def AG_workbook(lab, month, year, show_jurnal=False):
 
     users = list(User.objects.all().order_by("last_name"))
     wb = Workbook()
@@ -84,9 +94,22 @@ def AG_workbook(lab, month, year):
     #     "User","Lab","Subactivitate","Livrabil","Individual","Members",
     #     "Data","Nr ore","Durata","Descriere activitate","Comentarii","Links"
     #     ])
-    header = [
-        "Data","Nr ore","Durata","User","Lab","Activitate","Descriere","Individual","Livrabil","Links"
-        ]
+    fixed_header = [
+        "Data",
+        "Nr ore",
+        "Durata",
+        "User",
+        "Lab",
+        "Activitate",
+        "Descriere",
+        "Individual",
+        "Livrabil",
+    ]
+    if show_jurnal:
+        fixed_header.append("Jurnal")
+    fixed_header.append("Links")
+
+    header = list(fixed_header)
 
     header += [get_initials(u) for u in users]
 
@@ -101,7 +124,7 @@ def AG_workbook(lab, month, year):
     for col_idx in range(1, len(header) + 1):
         ws.cell(row=1, column=col_idx).fill = header_fill
     
-    base_columns = 10 
+    base_columns = len(fixed_header)
     for idx, user in enumerate(users):
         col_idx = base_columns + 1 + idx
         full_name = f"{user.first_name} {user.last_name}"
@@ -133,9 +156,11 @@ def AG_workbook(lab, month, year):
             e.activitate.nume,
             e.activity_description,
             "Da" if e.individual else "Nu",
-            e.livrabil,
-            e.links,
+            e.livrabil or "",
         ]
+        if show_jurnal:
+            row.append(getattr(e, "jurnal", "") or "")
+        row.append(e.links)
         row += member_columns
         row += [
             e.comentarii,
@@ -577,7 +602,7 @@ def build_sumary_sheet(wb, users, year, month, lab):
     autofit_sheet(ws)
 
 
-def conti_workbook(lab, users, month, year, director):
+def conti_workbook(lab, users, month, year, director, show_jurnal=False):
 
     days = calendar.monthrange(year, month)[1]
     month_name = months_to_RO(month)
@@ -590,9 +615,6 @@ def conti_workbook(lab, users, month, year, director):
     bold = Font(bold=True)
 
     weekend_fill = PatternFill(start_color="E82F32", end_color="E82F32", fill_type="solid")
-
-    thin = Border(*(Side(style="thin"),)*4)
-    thick = Border(*(Side(style="thick"),)*4)
 
     for user in users:
 
@@ -618,6 +640,10 @@ def conti_workbook(lab, users, month, year, director):
         ws["A10"] = "POST PROIECT"
         ws["B10"] = "ce post are fiecare"
 
+        # Thin borders for the small header blocks
+        apply_border(ws, 1, 1, 5, 2, thickness="thin")   # A1:B5
+        apply_border(ws, 7, 1, 8, 2, thickness="thin")   # A7:B8
+
         # ------------- ACTIVITIES TABLE -------------
         start = 12
 
@@ -626,11 +652,47 @@ def conti_workbook(lab, users, month, year, director):
         ws.cell(start,3,"Scurta descriere activitate")
         ws.cell(start,4,"Link")
         ws.cell(start,5,"Livrabile")
-        ws.cell(start,6,"Mapare activitate partener direct")
-        ws.cell(start,7,"Comentarii/Scurta descriere actiuni cercetare")
+        if show_jurnal:
+            ws.cell(start,6,"Jurnal")
+            ws.cell(start,7,"Mapare activitate partener direct")
+            ws.cell(start,8,"Comentarii/Scurta descriere actiuni cercetare")
+        else:
+            ws.cell(start,6,"Mapare activitate partener direct")
+            ws.cell(start,7,"Comentarii/Scurta descriere actiuni cercetare")
 
         nr_Activitati = 4
         activitati = list(lab.activitati.all().order_by("id")[:nr_Activitati])
+        activitate_index = {act.id: i for i, act in enumerate(activitati)}
+
+        # fetch entries once; used for both the activity summary table and the daily table
+        entries = WorkEntry.objects.filter(
+            user=user,
+            lab=lab,
+            date__year=year,
+            date__month=month
+        ).select_related("activitate")
+
+        links_by_act = defaultdict(list)
+        livrabile_by_act = defaultdict(list)
+        jurnal_by_act = defaultdict(list)
+        comentarii_by_act = defaultdict(list)
+
+        for e in entries:
+            act_id = e.activitate_id
+            if act_id not in activitate_index:
+                continue
+
+            if e.links:
+                links_by_act[act_id].append(str(e.links).strip())
+
+            if e.livrabil:
+                livrabile_by_act[act_id].append(str(e.livrabil).strip())
+
+            if show_jurnal and getattr(e, "jurnal", ""):
+                jurnal_by_act[act_id].append(str(e.jurnal).strip())
+
+            if e.comentarii:
+                comentarii_by_act[act_id].append(str(e.comentarii).strip())
 
         for i in range(1,nr_Activitati+1):
             r = start+i
@@ -642,9 +704,49 @@ def conti_workbook(lab, users, month, year, director):
             ws.cell(r, 2, act.nume)
             ws.cell(r, 3, act.descriere)
 
-        for r in range(start,nr_Activitati+8):
-            for c in range(1,11):
-                ws.cell(r,c).border=thin
+            act_id = act.id
+            # Column 4: Link (from WorkEntry.links)
+            seen_links = set()
+            links = []
+            for v in links_by_act.get(act_id, []):
+                if v and v not in seen_links:
+                    seen_links.add(v)
+                    links.append(v)
+            ws.cell(r, 4, "\n".join(links))
+
+            # Column 5: Livrabile (from WorkEntry.livrabil)
+            seen_livrabile = set()
+            livrabile = []
+            for v in livrabile_by_act.get(act_id, []):
+                if v and v not in seen_livrabile:
+                    seen_livrabile.add(v)
+                    livrabile.append(v)
+            ws.cell(r, 5, "\n".join(livrabile))
+
+            if show_jurnal:
+                seen_jurnal = set()
+                jurnal_values = []
+                for v in jurnal_by_act.get(act_id, []):
+                    if v and v not in seen_jurnal:
+                        seen_jurnal.add(v)
+                        jurnal_values.append(v)
+                ws.cell(r, 6, "\n".join(jurnal_values))
+
+            # Comentarii (from WorkEntry.comentarii)
+            seen_comments = set()
+            comments = []
+            for v in comentarii_by_act.get(act_id, []):
+                if v and v not in seen_comments:
+                    seen_comments.add(v)
+                    comments.append(v)
+            comments_col = 8 if show_jurnal else 7
+            ws.cell(r, comments_col, "\n".join(comments))
+
+        # Thin borders for the activitati block
+        activitati_end_row = start + nr_Activitati
+        last_activitati_col = 8 if show_jurnal else 7
+        apply_border(ws, start, 1, activitati_end_row, last_activitati_col, thickness="thin")
+
         # ------------- DAILY TABLE -------------
         r0 = 23
 
@@ -660,8 +762,6 @@ def conti_workbook(lab, users, month, year, director):
         ws.merge_cells(start_row=r0,start_column=10,end_row=r0+2,end_column=10)
         ws.cell(row=r0, column=10).alignment = center_wrapped
 
-        activitate_index = {act.id: i for i, act in enumerate(activitati)}
-
         # headers A1-A4
         for i in range(len(activitati)):
             col = 2 + i*2
@@ -675,14 +775,6 @@ def conti_workbook(lab, users, month, year, director):
 
             ws.cell(row=r0+2, column=col, value="nr ore")
             ws.cell(row=r0+2, column=col+1, value="interval")
-
-        # fetch entries
-        entries = WorkEntry.objects.filter(
-            user=user,
-            lab=lab,
-            date__year=year,
-            date__month=month
-        ).select_related("activitate")
 
         hours = {}
         durata = {}
@@ -734,9 +826,7 @@ def conti_workbook(lab, users, month, year, director):
         ws.cell(end,10,total_month).font=bold
 
         # borders
-        for r in range(r0,end+1):
-            for c in range(1,11):
-                ws.cell(r,c).border=thin
+        apply_border(ws, r0, 1, end, 10, thickness="thin")
                 
         ws.cell(end+5,2,"Aprobat,")
         ws.cell(end+6,2,f"Responsabil laborator in cercetare-proiectare\n"
@@ -790,17 +880,21 @@ def export_excel(request):
     memberships = LabMembership.objects.filter(lab=lab).select_related("profile__user")
     users = sorted([m.profile.user for m in memberships], key=lambda u: u.last_name)
 
-    wb_AG = AG_workbook(lab,month,year)
+    show_jurnal = should_show_jurnal_field(profile)
+    include_ag = show_jurnal and lab.id == LAB_JURNAL_ID
+
+    wb_AG = AG_workbook(lab, month, year, show_jurnal=show_jurnal) if include_ag else None
     wb_upt = upt_workbook(lab,users,month,year,request.user)
-    wb_conti = conti_workbook(lab,users,month,year,request.user)
+    wb_conti = conti_workbook(lab, users, month, year, request.user, show_jurnal=show_jurnal)
     wb_mipe =mipe_workbook(lab,users,month,year,request.user)
 
-    AG_buffer = BytesIO()
+    AG_buffer = BytesIO() if wb_AG is not None else None
     upt_buffer = BytesIO()
     conti_buffer = BytesIO()
     mipe_buffer = BytesIO()
 
-    wb_AG.save(AG_buffer)
+    if wb_AG is not None and AG_buffer is not None:
+        wb_AG.save(AG_buffer)
     wb_upt.save(upt_buffer)
     wb_conti.save(conti_buffer)
     wb_mipe.save(mipe_buffer)
@@ -808,7 +902,8 @@ def export_excel(request):
     zip_buffer = BytesIO()
 
     with zipfile.ZipFile(zip_buffer,"w") as z:
-        z.writestr("pontaj_tabel_AG.xlsx",AG_buffer.getvalue())
+        if AG_buffer is not None:
+            z.writestr("pontaj_tabel_AG.xlsx", AG_buffer.getvalue())
         z.writestr(f"pontaj_poli_{lab.name}_{month}_{year}.xlsx",upt_buffer.getvalue())
         z.writestr(f"pontaj_conti_{lab.name}_{month}_{year}.xlsx",conti_buffer.getvalue())
         z.writestr(f"pontaj_MIPE_{lab.name}_{month}_{year}.xlsx",mipe_buffer.getvalue())

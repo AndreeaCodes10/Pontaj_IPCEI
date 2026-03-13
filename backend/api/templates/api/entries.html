@@ -13,6 +13,9 @@
 
 <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 
+<script>
+    window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
+</script>
 <script src="{% static 'api/labs.js' %}"></script>
 <script src="{% static 'api/export.js' %}"></script>
 <script src="{% static 'api/auth.js' %}"></script>

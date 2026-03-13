@@ -71,14 +71,6 @@ class Activitate(models.Model):
 
 
 class WorkEntry(models.Model):
-    LIVRABIL_CHOICES = [
-        ("cod", "Cod"),
-        ("raport", "Raport"),
-        ("prezentare", "Prezentare"),
-        ("documentatie", "Documentație"),
-        ("altul", "Altul"),
-    ]
-
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
@@ -89,10 +81,8 @@ class WorkEntry(models.Model):
     )
 
     # Common fields
-    livrabil = models.CharField(
-        max_length=20,
-        choices=LIVRABIL_CHOICES
-    )
+    livrabil = models.TextField(blank=True, default="")
+    jurnal = models.TextField(blank=True, default="")
     individual = models.BooleanField(default=False)
     members = models.ManyToManyField(User, blank=True, related_name="shared_entries")
 
