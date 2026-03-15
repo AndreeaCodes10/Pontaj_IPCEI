@@ -5,12 +5,8 @@ FUNCTIONS:
 ----------
 lab_members(request, lab_id): 
     Lists members of a lab. Accessible by admin and lab members.
-add_user_to_lab(request, lab_id, user_id): 
-    Adds a user to a lab. Accessible by admin and lab directors.
-remove_user_from_lab(request, lab_id, user_id): 
-    Removes a user from a lab. Accessible by admin and lab directors.
-all_users(request): 
-    Lists all users. Accessible by admin and lab directors.
+update_monthly_hour_limit(request, lab_id, user_id):
+    Updates monthly_hour_limit for a lab member. Accessible by admin and lab directors.
 '''
 import json
 from django.http import JsonResponse, HttpResponseForbidden 
@@ -39,6 +35,7 @@ def lab_members(request, lab_id):
             "id": m.profile.user.id,
             "username": m.profile.user.username,
             "role": m.role,
+            "monthly_hour_limit": m.monthly_hour_limit,
         }
         for m in memberships
     ]
@@ -46,94 +43,57 @@ def lab_members(request, lab_id):
     return JsonResponse(data, safe=False)
 
 @login_required
-@require_http_methods(["POST"])
-def add_user_to_lab(request, lab_id, user_id):
-    '''Endpoint to add a user to a lab. Only admin or lab director can perform this action.'''
-    lab = get_object_or_404(Lab, id=lab_id)
-    user = get_object_or_404(User, id=user_id)
+@require_http_methods(["PATCH", "POST"])
+def update_monthly_hour_limit(request, lab_id, user_id):
+    """Update monthly_hour_limit for a user within a lab.
 
-    profile = request.user.userprofile
-
-    if profile.role != "admin" and not LabMembership.objects.filter(
-        lab=lab, profile=profile, role="director"
-    ).exists():
-        return HttpResponseForbidden()
-
-    LabMembership.objects.get_or_create(
-        lab=lab,
-        profile=user.userprofile,
-        defaults={"role": "member"},
-    )
-
-    return JsonResponse({"status": "ok"})
-
-@login_required
-@require_http_methods(["DELETE"])
-def remove_user_from_lab(request, lab_id, user_id):
-    """Remove a user from a lab.
-    Admins can remove anyone.
-    Directors can remove anyone except themselves.
+    Permissions:
+    - Admins can update any lab membership.
+    - Lab directors can update membership limits for their lab.
     """
 
     lab = get_object_or_404(Lab, id=lab_id)
     target_user = get_object_or_404(User, id=user_id)
 
     requester_profile = request.user.userprofile
-    target_profile = target_user.userprofile
-    # Admin can remove anyone without membership check
-    if requester_profile.role == "admin":
-        LabMembership.objects.filter(
-            lab=lab,
-            profile=target_profile
-        ).delete()
 
-        return JsonResponse({"status": "ok"})
+    is_admin = requester_profile.role == "admin"
+    is_director_in_lab = LabMembership.objects.filter(
+        lab=lab, profile=requester_profile, role="director"
+    ).exists()
 
-    try:
-        requester_membership = LabMembership.objects.get(
-            lab=lab, profile=requester_profile
-        )
-    except LabMembership.DoesNotExist:
+    if not (is_admin or is_director_in_lab):
         return HttpResponseForbidden()
 
     try:
-        target_membership = LabMembership.objects.get(
-            lab=lab, profile=target_profile
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
+
+    if "monthly_hour_limit" not in payload:
+        return JsonResponse(
+            {"status": "error", "message": "monthly_hour_limit is required"},
+            status=400,
         )
-    except LabMembership.DoesNotExist:
-        return JsonResponse({"status": "not_member"})
 
-    # Admin can remove anyone
-    if requester_profile.role == "admin":
-        target_membership.delete()
-        return JsonResponse({"status": "ok"})
+    try:
+        new_limit = int(payload["monthly_hour_limit"])
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {"status": "error", "message": "monthly_hour_limit must be an integer"},
+            status=400,
+        )
 
-    # Director permissions
-    if requester_membership.role == "director":
-        if target_user == request.user:
-            return JsonResponse(
-                {"status": "error", "message": "Director cannot remove themselves"},
-                status=403
-            )
+    if new_limit < 0 or new_limit > 1000:
+        return JsonResponse(
+            {"status": "error", "message": "monthly_hour_limit out of range"},
+            status=400,
+        )
 
-        target_membership.delete()
-        return JsonResponse({"status": "ok"})
+    membership = get_object_or_404(
+        LabMembership, lab=lab, profile=target_user.userprofile
+    )
+    membership.monthly_hour_limit = new_limit
+    membership.save(update_fields=["monthly_hour_limit"])
 
-    return HttpResponseForbidden()
-
-@login_required
-def all_users(request):
-    '''Endpoint to list all users, for admin and director use only'''
-    profile = request.user.userprofile
-
-    if profile.role == "admin":
-        pass
-    else:
-        if not LabMembership.objects.filter(
-            profile=profile, role="director"
-        ).exists():
-            return HttpResponseForbidden()
-
-    users = User.objects.all()
-    data = [{"id": u.id, "username": u.username} for u in users]
-    return JsonResponse(data, safe=False)
+    return JsonResponse({"status": "ok", "monthly_hour_limit": membership.monthly_hour_limit})

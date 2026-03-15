@@ -349,15 +349,28 @@ button{
   border-radius:6px;
 }
 
-.member-row button{
-  border:0;
-  background:transparent;
-  color:#6E3057;
-  cursor:pointer;
-}
+.member-meta{display:flex; flex-direction:column; gap:2px}
+.member-name{font-weight:600}
+.member-role{font-size:.8rem; color:var(--muted)}
 
-.add-member-section{display:flex;gap:6px}
-#addUserSelect{flex:1}
+.member-limit{display:flex; align-items:center; gap:6px}
+.member-limit-input{
+  width:84px;
+  padding:4px 6px;
+  border:1px solid #ddd;
+  border-radius:6px;
+}
+.save-limit-btn{
+  border:1px solid #6E3057;
+  background:#6E3057;
+  color:#fff;
+  cursor:pointer;
+  padding:4px 8px;
+  border-radius:6px;
+  font-size:.85rem;
+}
+.save-limit-btn:disabled{opacity:.7; cursor:default}
+.member-limit-readonly{color:var(--muted); font-size:.9rem}
 
 /* Footer */
 footer{

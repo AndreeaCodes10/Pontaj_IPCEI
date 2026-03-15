@@ -54,10 +54,6 @@ const Labs = {
             Members.applyLabPermissions(user);
             Form.applyPermissions(user);
             Members.loadLabMembers(labId);
-            if (user.global_role === "admin" || user.lab_role === "director") {
-                // loadLabMembers(labId);
-                Members.loadAllUsers(labId);
-            }
             Auth.loadAuthArea(labId); 
             await this.loadActivitati(labId);
             Calendar.loadCalendarForLab(labId);

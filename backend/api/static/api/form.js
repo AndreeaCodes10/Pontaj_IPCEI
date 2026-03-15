@@ -174,6 +174,15 @@ const Form = {
         const formattedDate = this.convertToBackendDate(
             document.getElementById("date").value
         );
+        if (formattedDate) {
+            const [yy, mm, dd] = formattedDate.split("-").map(n => parseInt(n, 10));
+            const dateObj = new Date(yy, (mm || 1) - 1, dd || 1);
+            const dow = dateObj.getDay(); // 0=Sun .. 6=Sat
+            if (dow === 0 || dow === 6) {
+                alert("Ați încercat să pontați in weekend");
+                return;
+            }
+        }
 
         const startTime = this.startTimeInput?.value || "";
         const nrOre = parseInt(this.nrOreInput?.value || "", 10);

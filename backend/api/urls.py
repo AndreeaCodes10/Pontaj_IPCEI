@@ -27,8 +27,10 @@ urlpatterns = [
     path("work-entry/<int:entry_id>/", views.delete_work_entry, name="delete-work-entry"),
 
     path("labs/<int:lab_id>/members/", users_views.lab_members),
-    path("labs/<int:lab_id>/add/<int:user_id>/", users_views.add_user_to_lab),
-    path("labs/<int:lab_id>/remove/<int:user_id>/", users_views.remove_user_from_lab),
-    path("all-users/", users_views.all_users, name="all-users"),
+    path(
+        "labs/<int:lab_id>/members/<int:user_id>/monthly-hour-limit/",
+        users_views.update_monthly_hour_limit,
+        name="update-monthly-hour-limit",
+    ),
 
 ]

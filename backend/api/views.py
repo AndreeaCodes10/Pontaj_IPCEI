@@ -23,6 +23,7 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font
 from openpyxl.styles.borders import Border, Side
 from io import BytesIO
+from . import export_views
 
 
 @csrf_exempt
@@ -260,6 +261,11 @@ def create_work_entry(request):
             data["comentarii"] = ""
 
         date_obj = datetime.strptime(data["date"], "%Y-%m-%d")
+        if date_obj.weekday() >= 5:  # 5=Saturday, 6=Sunday
+            return JsonResponse(
+                {"error": "Ați încercat să pontați in weekend"},
+                status=400,
+            )
         month = date_obj.month
         year = date_obj.year
 
@@ -362,6 +368,8 @@ def generate_jurnal_docx(request):
     lab_id = request.GET.get("lab")
     month = request.GET.get("month")
     year = request.GET.get("year")
+    luna = export_views.months_to_RO(int(month))
+
 
     try:
         month = int(month)
@@ -411,7 +419,7 @@ def generate_jurnal_docx(request):
 
         # Black, underlined link (Word default look, but explicit).
         color = OxmlElement("w:color")
-        color.set(qn("w:val"), "0000FF")
+        color.set(qn("w:val"), "467886")
         r_pr.append(color)
 
         u = OxmlElement("w:u")
@@ -440,7 +448,7 @@ def generate_jurnal_docx(request):
     set_document_font_times_new_roman(doc)
 
     for e in entries:
-        date_str = e.date.strftime("%d-%m-%Y")
+        date_str = f"{e.date.day} {luna} {e.date.year}"
         durata_str = (e.durata or "").strip()
 
         line2 = (e.scurta_descriere_jurnal or "").strip()

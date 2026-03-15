@@ -14,9 +14,18 @@ const Calendar = {
             this.datePickerInstance.destroy();
         }
 
+        const defaultDate = new Date();
+        const dow = defaultDate.getDay(); // 0=Sun .. 6=Sat
+        if (dow === 6) defaultDate.setDate(defaultDate.getDate() + 2);
+        if (dow === 0) defaultDate.setDate(defaultDate.getDate() + 1);
+
         this.datePickerInstance = flatpickr("#date", {
-            defaultDate: new Date(),
+            defaultDate,
             dateFormat: "d-m-Y",
+            disableMobile: true,
+            disable: [
+                (date) => date.getDay() === 0 || date.getDay() === 6
+            ],
 
             onChange: (selectedDates) => {
                 if (!selectedDates.length) return;

@@ -572,7 +572,7 @@ def build_sumary_sheet(wb, users, year, month, lab):
         ws.cell(header_row+1,c).font = bold
 
     ws.merge_cells(start_row=header_row, start_column=7, end_row=header_row+1, end_column=7)
-    ws.cell(header_row,7,"TOTAL zi").alignment = center
+    ws.cell(header_row,7,"TOTAL").alignment = center
     ws.cell(header_row,7).font = bold
 
     # ---------------- FETCH ENTRIES ----------------
@@ -623,7 +623,7 @@ def build_sumary_sheet(wb, users, year, month, lab):
 
     # ---------------- MONTH TOTALS ----------------
 
-    ws.cell(row,1,"TOTAL LAB").font = bold
+    ws.cell(row,1,"TOTAL").font = bold
     grand_total = 0
 
     for act_id, i in activitate_index.items():
@@ -656,6 +656,26 @@ def build_sumary_sheet(wb, users, year, month, lab):
     autofit_sheet(ws)
 
 
+def normalize_url(value):
+        value = str(value or "").strip()
+        if not value:
+            return ""
+        if value.startswith(("http://", "https://", "mailto:")):
+            return value
+        if value.startswith("www."):
+            return f"https://{value}"
+        return ""
+
+def write_hyperlink(ws, row, col, raw_value):
+    link_font = Font(color="215C98", underline="single")
+    text = str(raw_value or "").strip()
+    cell = ws.cell(row=row, column=col, value=text)
+    url = normalize_url(text)
+    if url:
+        cell.hyperlink = url
+        cell.font = link_font
+    return cell
+
 def conti_workbook(lab, users, month, year, director):
 
     days = calendar.monthrange(year, month)[1]
@@ -667,8 +687,37 @@ def conti_workbook(lab, users, month, year, director):
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     center_wrapped = Alignment(horizontal="center", vertical="center", wrap_text=True)
     bold = Font(bold=True)
+    color = Font(color="C00000", bold=True)
+    wb_fill = PatternFill(start_color="DAF2D0", end_color="DAF2D0", fill_type="solid") 
 
-    weekend_fill = PatternFill(start_color="E82F32", end_color="E82F32", fill_type="solid")
+    # Shared (director-entered) monthly fields are the same for every user sheet.
+    activitati = list(lab.activitati.all().order_by("id"))
+    activitate_index = {act.id: i for i, act in enumerate(activitati)}
+    activitate_ids = {act.id for act in activitati}
+    nr_Activitati = len(activitati)
+
+
+    meta_entries = WorkEntry.objects.filter(
+        user=director,
+        lab=lab,
+        date__year=year,
+        date__month=month
+    ).select_related("activitate").order_by("date", "id")
+
+    links_by_act = {}
+    livrabile_by_act = {}
+    comentarii_by_act = {}
+
+    for e in meta_entries:
+        act_id = e.activitate_id
+        if act_id not in activitate_ids:
+            continue
+        if e.links:
+            links_by_act[act_id] = str(e.links).strip()
+        if e.livrabil:
+            livrabile_by_act[act_id] = str(e.livrabil).strip()
+        if e.comentarii:
+            comentarii_by_act[act_id] = str(e.comentarii).strip()
 
     for user in users:
 
@@ -678,22 +727,36 @@ def conti_workbook(lab, users, month, year, director):
         ws["A1"] = "Info:"
         ws["B1"] = f"Activitati de cercetare fundamentala in cadrul {lab}"
         ws["A2"] = "Metode avansate de proiectare în vederea reducerii puterii disipate în circuitele mixte analog-digitale și arhitecturi RISC-V"
+        ws.cell(row=2, column=1).font = color
         ws.merge_cells(start_row=2,start_column=1,end_row=2,end_column=2)
         ws["A3"] = "PI:"
         ws["B3"] = "Universitatea Politehnica Timisoara"
         ws["A4"] = "Traductoare inteligente eficiente din punct de vedere energetic pentru sisteme auto  – inovație de-a lungul lanțului valoric (ASSET-IxC - UPT) "
         ws.merge_cells(start_row=4,start_column=1,end_row=4,end_column=2)
+        ws.cell(row=4, column=1).font = color
         ws["A5"] = "NR:"
         ws["B5"] = "5.PI/I4/C9"
 
         ws["A7"] = "PONTAJ INDIVIDUAL PENTRU LUNA/ANUL:"
-        ws["B7"] = f"{month_name}/{year}"
+        ws["B7"] = f"{month_name.upper()}/{year}"
+        ws.cell(row=7, column=1).font = bold
 
         ws["A8"] = "NUME SI PRENUME:"
-        ws["B8"] = f"{user.last_name} {user.first_name}"
+        ws["B8"] = f"{user.last_name.upper()} {user.first_name}"
+        ws.cell(row=8, column=1).font = bold
 
         ws["A10"] = "POST PROIECT"
         ws["B10"] = "ce post are fiecare"
+        ws.cell(row=10, column=1).font = bold
+
+        for r in (7,8,10):
+            ws.cell(r,2).font = color
+        for r in (1,3,5):
+            for c in (1,2):
+                ws.cell(r,c).font = bold
+        for r in range(1,11):
+            for c in range(1,3):
+                ws.cell(r,c).alignment = center
 
         # Thin borders for the small header blocks
         apply_border(ws, 1, 1, 5, 2, thickness="thin")   # A1:B5
@@ -711,12 +774,11 @@ def conti_workbook(lab, users, month, year, director):
 
         ws.cell(start,6,"Mapare activitate partener direct")
         ws.cell(start,7,"Comentarii/Scurta descriere actiuni cercetare")
+        for c in range(1,8):
+            ws.cell(start,c).font = bold
+            ws.cell(start,c).alignment = center_wrapped
 
-        nr_Activitati = 4
-        activitati = list(lab.activitati.all().order_by("id")[:nr_Activitati])
-        activitate_index = {act.id: i for i, act in enumerate(activitati)}
-
-        # fetch entries once; used for both the activity summary table and the daily table
+        # User entries for the daily table.
         entries = WorkEntry.objects.filter(
             user=user,
             lab=lab,
@@ -724,62 +786,30 @@ def conti_workbook(lab, users, month, year, director):
             date__month=month
         ).select_related("activitate")
 
-        links_by_act = defaultdict(list)
-        livrabile_by_act = defaultdict(list)
-        comentarii_by_act = defaultdict(list)
-
-        for e in entries:
-            act_id = e.activitate_id
-            if act_id not in activitate_index:
-                continue
-
-            if e.links:
-                links_by_act[act_id].append(str(e.links).strip())
-
-            if e.livrabil:
-                livrabile_by_act[act_id].append(str(e.livrabil).strip())
-
-            if e.comentarii:
-                comentarii_by_act[act_id].append(str(e.comentarii).strip())
-
         for i in range(1,nr_Activitati+1):
             r = start+i
-            ws.cell(r,1,f"A{i}")
+            ws.cell(r,1,f"A{i}").font = bold
+            ws.cell(row=r, column=1).alignment = center_wrapped
 
         # Fill the activity description block from admin-maintained Activitate.descriere.
         for i, act in enumerate(activitati):
             r = start + 1 + i
             ws.cell(r, 2, (act.denumire_activitate or "").strip() or act.nume)
+            ws.cell(row=r, column=2).alignment = center_wrapped
             ws.cell(r, 3, act.descriere)
-
+            ws.cell(row=r, column=3).alignment = center_wrapped
             act_id = act.id
             # Column 4: Link (from WorkEntry.links)
-            seen_links = set()
-            links = []
-            for v in links_by_act.get(act_id, []):
-                if v and v not in seen_links:
-                    seen_links.add(v)
-                    links.append(v)
-            ws.cell(r, 4, "\n".join(links))
+            link_cell = write_hyperlink(ws, r, 4, links_by_act.get(act_id, ""))
+            link_cell.alignment = center_wrapped
 
             # Column 5: Livrabile (from WorkEntry.livrabil)
-            seen_livrabile = set()
-            livrabile = []
-            for v in livrabile_by_act.get(act_id, []):
-                if v and v not in seen_livrabile:
-                    seen_livrabile.add(v)
-                    livrabile.append(v)
-            ws.cell(r, 5, "\n".join(livrabile))
+            liv_cell = write_hyperlink(ws, r, 5, livrabile_by_act.get(act_id, ""))
+            liv_cell.alignment = center_wrapped
 
             # Comentarii (from WorkEntry.comentarii)
-            seen_comments = set()
-            comments = []
-            for v in comentarii_by_act.get(act_id, []):
-                if v and v not in seen_comments:
-                    seen_comments.add(v)
-                    comments.append(v)
-            comments_col = 7
-            ws.cell(r, comments_col, "\n".join(comments))
+            comm_cell = ws.cell(r, 7, comentarii_by_act.get(act_id, ""))
+            comm_cell.alignment = center_wrapped
 
         # Thin borders for the activitati block
         activitati_end_row = start + nr_Activitati
@@ -812,8 +842,8 @@ def conti_workbook(lab, users, month, year, director):
 
             ws.merge_cells(start_row=r0+1, start_column=col, end_row=r0+1, end_column=col+1)
 
-            ws.cell(row=r0+2, column=col, value="nr ore")
-            ws.cell(row=r0+2, column=col+1, value="interval")
+            ws.cell(row=r0+2, column=col, value="nr ore").alignment=center
+            ws.cell(row=r0+2, column=col+1, value="interval").alignment=center
 
         hours = {}
         durata = {}
@@ -869,16 +899,19 @@ def conti_workbook(lab, users, month, year, director):
                 
         ws.cell(end+5,2,"Aprobat,")
         ws.cell(end+6,2,f"Responsabil laborator in cercetare-proiectare\n"
-                        f"pentru activitatea {lab.name},")
+                        f"pentru activitatea {lab.name[-1]},")
         ws.merge_cells(start_row=end+6,start_column=2,end_row=end+6,end_column=3)
-        ws.cell(end+7,2,f"{director}")
+        ws.cell(end+7,2,f"{director.last_name.upper()} {director.first_name}")
         ws.cell(end+8,2,f"Semnătura")
 
         ws.cell(end+5,8,"Aprobat,")
-        ws.cell(end+6,8,f"Responsabil AUMOVIO pentru activitatea {lab.name},")
+        ws.cell(end+6,8,f"Responsabil AUMOVIO pentru activitatea {lab.name[-1]},")
         ws.cell(end+7,8,f"----Nume angajat conti----")
         ws.merge_cells(start_row=end+6,start_column=8,end_row=end+6,end_column=11)
         ws.cell(end+8,8,f"Semnătura")
+        for r in range(1, end+9):
+            for c in range(1,12):
+                ws.cell(row=r, column=c).fill = wb_fill
 
         # auto‑size sheet
         autofit_sheet(ws)
@@ -919,13 +952,24 @@ def export_excel(request):
     memberships = LabMembership.objects.filter(lab=lab).select_related("profile__user")
     users = sorted([m.profile.user for m in memberships], key=lambda u: u.last_name)
 
+    director_membership = (
+        LabMembership.objects.filter(lab=lab, role="director")
+        .select_related("profile__user")
+        .first()
+    )
+    director_user = (
+        director_membership.profile.user
+        if director_membership is not None
+        else request.user
+    )
+
     show_jurnal = should_show_jurnal_field(profile)
     include_ag = show_jurnal and lab.id == LAB_JURNAL_ID
 
     wb_AG = AG_workbook(lab, month, year, show_jurnal=show_jurnal) if include_ag else None
-    wb_upt = upt_workbook(lab,users,month,year,request.user)
-    wb_conti = conti_workbook(lab, users, month, year, request.user)
-    wb_mipe =mipe_workbook(lab,users,month,year,request.user)
+    wb_upt = upt_workbook(lab,users,month,year,director_user)
+    wb_conti = conti_workbook(lab, users, month, year, director_user)
+    wb_mipe =mipe_workbook(lab,users,month,year,director_user)
 
     AG_buffer = BytesIO() if wb_AG is not None else None
     upt_buffer = BytesIO()
