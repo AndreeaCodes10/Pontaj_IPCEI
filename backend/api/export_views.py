@@ -681,8 +681,7 @@ def conti_workbook(lab, users, month, year, director):
     days = calendar.monthrange(year, month)[1]
     month_name = months_to_RO(month)
 
-    wb = Workbook()
-    wb.remove(wb.active)
+    user_workbooks = []
 
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     center_wrapped = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -719,14 +718,23 @@ def conti_workbook(lab, users, month, year, director):
         if e.comentarii:
             comentarii_by_act[act_id] = str(e.comentarii).strip()
 
+    membership_by_user_id = {
+        m.profile.user_id: m
+        for m in LabMembership.objects.filter(lab=lab, profile__user__in=users).select_related(
+            "profile__user"
+        )
+    }
+
     for user in users:
 
-        ws = wb.create_sheet(f"{user.last_name}_{user.first_name}")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"{user.last_name}_{user.first_name}"
 
         # ---------------- HEADER ----------------
         ws["A1"] = "Info:"
         ws["B1"] = f"Activitati de cercetare fundamentala in cadrul {lab}"
-        ws["A2"] = "Metode avansate de proiectare în vederea reducerii puterii disipate în circuitele mixte analog-digitale și arhitecturi RISC-V"
+        ws["A2"] = (lab.titlu or "").strip()
         ws.cell(row=2, column=1).font = color
         ws.merge_cells(start_row=2,start_column=1,end_row=2,end_column=2)
         ws["A3"] = "PI:"
@@ -746,7 +754,8 @@ def conti_workbook(lab, users, month, year, director):
         ws.cell(row=8, column=1).font = bold
 
         ws["A10"] = "POST PROIECT"
-        ws["B10"] = "ce post are fiecare"
+        membership = membership_by_user_id.get(user.id)
+        ws["B10"] = (membership.post or "") if membership else ""
         ws.cell(row=10, column=1).font = bold
 
         for r in (7,8,10):
@@ -916,8 +925,12 @@ def conti_workbook(lab, users, month, year, director):
         # auto‑size sheet
         autofit_sheet(ws)
 
-    build_sumary_sheet(wb, users, year, month, lab)
-    return wb
+        user_workbooks.append((user, wb))
+
+    sumary_wb = Workbook()
+    sumary_wb.remove(sumary_wb.active)
+    build_sumary_sheet(sumary_wb, users, year, month, lab)
+    return user_workbooks, sumary_wb
 
 @require_http_methods(["GET"])
 def export_excel(request):
@@ -968,18 +981,16 @@ def export_excel(request):
 
     wb_AG = AG_workbook(lab, month, year, show_jurnal=show_jurnal) if include_ag else None
     wb_upt = upt_workbook(lab,users,month,year,director_user)
-    wb_conti = conti_workbook(lab, users, month, year, director_user)
+    conti_user_workbooks, conti_sumary_wb = conti_workbook(lab, users, month, year, director_user)
     wb_mipe =mipe_workbook(lab,users,month,year,director_user)
 
     AG_buffer = BytesIO() if wb_AG is not None else None
     upt_buffer = BytesIO()
-    conti_buffer = BytesIO()
     mipe_buffer = BytesIO()
 
     if wb_AG is not None and AG_buffer is not None:
         wb_AG.save(AG_buffer)
     wb_upt.save(upt_buffer)
-    wb_conti.save(conti_buffer)
     wb_mipe.save(mipe_buffer)
 
     zip_buffer = BytesIO()
@@ -988,7 +999,19 @@ def export_excel(request):
         if AG_buffer is not None:
             z.writestr("pontaj_tabel_AG.xlsx", AG_buffer.getvalue())
         z.writestr(f"pontaj_poli_{lab.name}_{month}_{year}.xlsx",upt_buffer.getvalue())
-        z.writestr(f"pontaj_conti_{lab.name}_{month}_{year}.xlsx",conti_buffer.getvalue())
+        conti_sumary_buffer = BytesIO()
+        conti_sumary_wb.save(conti_sumary_buffer)
+        z.writestr(
+            f"pontaj_conti_sumary_{lab.name}_{month}_{year}.xlsx",
+            conti_sumary_buffer.getvalue(),
+        )
+        for user, wb in conti_user_workbooks:
+            user_buffer = BytesIO()
+            wb.save(user_buffer)
+            z.writestr(
+                f"L{lab.name[-1]}_Pontaj_{month}_{months_to_RO(month)}_{user.last_name.upper()}_{user.first_name}.xlsx",
+                user_buffer.getvalue(),
+            )
         z.writestr(f"pontaj_MIPE_{lab.name}_{month}_{year}.xlsx",mipe_buffer.getvalue())
 
     zip_buffer.seek(0)

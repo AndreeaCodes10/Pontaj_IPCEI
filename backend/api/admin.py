@@ -18,13 +18,13 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(LabMembership)
 class LabMembershipAdmin(admin.ModelAdmin):
-    list_display = ("profile", "lab", "role", "monthly_hour_limit")  # Add monthly_hour_limit to the list display
+    list_display = ("profile", "lab", "role", "monthly_hour_limit", "post")
     list_filter = ("lab", "role")
     search_fields = ("profile__user__username", "lab__name")
     
 @admin.register(Lab)
 class LabAdmin(admin.ModelAdmin):
-    list_display = ("name",)
+    list_display = ("name", "titlu")
     inlines = [ActivitateInline]
 
 

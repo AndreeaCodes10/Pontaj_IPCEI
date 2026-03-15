@@ -52,6 +52,12 @@ const Form = {
             return;
         }
 
+        if (nrOre > 12) {
+            alert("Nr. ore nu poate fi mai mare de 12.");
+            this.durataInput.value = "";
+            return;
+        }
+
         if (!startTime || !Number.isFinite(nrOre) || nrOre <= 0) {
             this.durataInput.value = "";
             return;
@@ -186,6 +192,10 @@ const Form = {
 
         const startTime = this.startTimeInput?.value || "";
         const nrOre = parseInt(this.nrOreInput?.value || "", 10);
+        if (!Number.isFinite(nrOre) || nrOre < 1 || nrOre > 12) {
+            alert("Nr. ore trebuie să fie între 1 și 12.");
+            return;
+        }
 
         const selectedMembers = [
             ...document.querySelectorAll("#members input:checked")

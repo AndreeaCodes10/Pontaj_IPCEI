@@ -276,7 +276,13 @@ def create_work_entry(request):
             date__year=year
         ).aggregate(total=Sum("nr_ore"))["total"] or 0
 
-        new_hours = int(data["nr_ore"])
+        try:
+            new_hours = int(data["nr_ore"])
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "nr_ore must be an integer"}, status=400)
+
+        if new_hours < 1 or new_hours > 12:
+            return JsonResponse({"error": "nr_ore must be between 1 and 12"}, status=400)
 
         # Directors/members get per-lab limits via LabMembership. Admins may not have
         # a LabMembership row, so fall back to their profile limit.

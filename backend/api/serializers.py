@@ -42,6 +42,13 @@ class WorkEntrySerializer(serializers.ModelSerializer):
         # not submitted by the user.
         read_only_fields = ["user", "activity_description"]
 
+    def validate_nr_ore(self, value):
+        if value is None:
+            raise serializers.ValidationError("nr_ore is required.")
+        if value < 1 or value > 12:
+            raise serializers.ValidationError("nr_ore must be between 1 and 12.")
+        return value
+
     def validate(self, data):
         # ensure durata format HH:MM-HH:MM
         if "-" not in data["durata"]:

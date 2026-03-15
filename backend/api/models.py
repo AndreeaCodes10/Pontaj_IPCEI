@@ -7,6 +7,7 @@ from django.dispatch import receiver
 
 class Lab(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    titlu = models.CharField(max_length=255, blank=True, default="")
     
     def __str__(self):
         return self.name
@@ -36,6 +37,7 @@ class LabMembership(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="member")
 
     monthly_hour_limit = models.IntegerField(default=40)
+    post = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         unique_together = ("profile", "lab")

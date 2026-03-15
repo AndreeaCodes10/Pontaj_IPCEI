@@ -32,5 +32,10 @@ urlpatterns = [
         users_views.update_monthly_hour_limit,
         name="update-monthly-hour-limit",
     ),
+    path(
+        "labs/<int:lab_id>/members/<int:user_id>/monthly-hour-limit/anexa1-docx/",
+        users_views.generate_anexa1_referat_modificare_docx,
+        name="generate-anexa1-referat-modificare-docx",
+    ),
 
 ]

@@ -11,8 +11,8 @@ const Labs = {
         this.scurtaDescriereJurnalGroup = document.getElementById("scurtaDescriereJurnalGroup");
         this.generatedJurnalGroup = document.getElementById("generatedJurnalGroup");
 
-        this.loadLabs();
         this.attachEvents();
+        this.loadLabs();
     },
 
     async loadLabs() {
@@ -27,6 +27,11 @@ const Labs = {
             opt.textContent = lab.name;
             this.labSelect.appendChild(opt);
         });
+
+        if (Array.isArray(labs) && labs.length === 1) {
+            this.labSelect.value = String(labs[0].id);
+            this.labSelect.dispatchEvent(new Event("change"));
+        }
     },
 
     attachEvents() {

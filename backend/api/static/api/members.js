@@ -104,6 +104,19 @@ const Members = {
                     setTimeout(() => {
                         btn.textContent = "Save";
                     }, 800);
+
+                    if (user?.lab_role === "director") {
+                        const ok = window.confirm('Generezi acum documentul "ANEXA 1 Referat Modificare"?');
+                        if (ok) {
+                            const url = `/api/labs/${labId}/members/${uid}/monthly-hour-limit/anexa1-docx/`;
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = "ANEXA 1 Referat Modificare.docx";
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                        }
+                    }
                 } finally {
                     btn.disabled = false;
                 }
