@@ -96,8 +96,11 @@ const Form = {
             alert("Selecteaza un lab.");
             return;
         }
-        if (String(labId) !== "2") {
-            alert("Jurnalul se genereaza doar pentru Lab 2.");
+        
+        const labName = Labs.labMap?.[labId];
+
+        if (!["Lab1", "Lab2"].includes(labName)) {
+            alert("Jurnalul se genereaza doar pentru lab1 si lab2.");
             return;
         }
 
@@ -148,9 +151,18 @@ const Form = {
 
         this.canEditMonthly = !!canEditMonthly;
 
+        const currentLabName = Labs.labMap && window.currentLabId
+            ? Labs.labMap[window.currentLabId]
+            : null;
+
         const canSeeJurnalForLab =
             !!(user?.can_see_jurnal ?? window.canSeeJurnal) &&
-            String(window.currentLabId) === "2";
+            ["Lab1", "Lab2"].includes(currentLabName);
+        console.log("currentLabId:", window.currentLabId);
+        console.log("currentLabName:", currentLabName);
+        console.log("can_see_jurnal:", user?.can_see_jurnal);
+        console.log("canSeeJurnal:", window.canSeeJurnal);
+        console.log("canSeeJurnalForLab:", canSeeJurnalForLab);
 
         const showMonthlySection = this.canEditMonthly || canSeeJurnalForLab;
 
@@ -252,7 +264,16 @@ const Form = {
 
             if (lab) Calendar.loadCalendarForLab(lab);
         }else {
-            alert("Error saving entry.");
+            let message = "Error saving entry.";
+
+            try {
+                const data = await response.json();
+                if (data.error) message = data.error;
+            } catch (e) {
+                // response wasn't JSON
+            }
+
+            alert(message);
         }
     }
 };

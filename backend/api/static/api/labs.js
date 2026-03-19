@@ -18,10 +18,13 @@ const Labs = {
     async loadLabs() {
         const response = await fetch("/api/labs/");
         const labs = await response.json();
+        this.labMap = {};
 
         this.labSelect.innerHTML = "<option value=''>Select Labs</option>";
 
         labs.forEach(lab => {
+            this.labMap[lab.id] = lab.name;
+
             const opt = document.createElement("option");
             opt.value = lab.id;
             opt.textContent = lab.name;
@@ -46,15 +49,15 @@ const Labs = {
 
             if (this.jurnalGroup) {
                 this.jurnalGroup.style.display =
-                    window.canSeeJurnal && String(labId) === "2" ? "block" : "none";
+                    window.canSeeJurnal && ["Lab1", "Lab2"].includes(this.labMap[labId])? "block": "none";
             }
             if (this.scurtaDescriereJurnalGroup) {
                 this.scurtaDescriereJurnalGroup.style.display =
-                    window.canSeeJurnal && String(labId) === "2" ? "block" : "none";
+                    window.canSeeJurnal && ["Lab1", "Lab2"].includes(this.labMap[labId])? "block": "none";
             }
             if (this.generatedJurnalGroup) {
                 this.generatedJurnalGroup.style.display =
-                    window.canSeeJurnal && String(labId) === "2" ? "block" : "none";
+                    window.canSeeJurnal && ["Lab1", "Lab2"].includes(this.labMap[labId])? "block": "none";
             }
             Members.applyLabPermissions(user);
             Form.applyPermissions(user);

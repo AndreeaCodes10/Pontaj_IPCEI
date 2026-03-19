@@ -7,6 +7,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, render, redirect
+from django.utils.http import url_has_allowed_host_and_scheme
 from .serializers import WorkEntrySerializer
 import openpyxl
 from datetime import datetime
@@ -25,9 +26,11 @@ from openpyxl.styles.borders import Border, Side
 from io import BytesIO
 from . import export_views
 
+LAB_JURNAL_NAMES = ["Lab1", "Lab2"]
 
 @csrf_exempt
 def login_page(request):
+    next_url = request.GET.get("next") or request.POST.get("next") or ""
     if request.method == "POST":
         username = request.POST.get("username")
         password = request.POST.get("password")
@@ -36,11 +39,17 @@ def login_page(request):
 
         if user is not None:
             login(request, user)
-            return redirect("index")   # redirect to your main page
+            if next_url and url_has_allowed_host_and_scheme(
+                next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+            ):
+                return redirect(next_url)
+            return redirect("index")  # redirect to your main page
         else:
-            return render(request, "api/login.html", {"error": "Invalid credentials"})
+            return render(
+                request, "api/login.html", {"error": "Invalid credentials", "next": next_url}
+            )
 
-    return render(request, "api/login.html")
+    return render(request, "api/login.html", {"next": next_url})
     
 @api_view(['POST'])
 def logout_view(request):
@@ -147,7 +156,11 @@ def current_user(request):
     lab_id = request.GET.get("lab")
 
     lab_role = None
-    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
+    can_see_jurnal = LabMembership.objects.filter(
+        profile=profile,
+        lab__name__in=LAB_JURNAL_NAMES
+    ).exists()
+    print("CAN SEE JURNAL:", can_see_jurnal)
 
     if lab_id:
         try:
@@ -170,13 +183,19 @@ def current_user(request):
 @login_required
 def index(request):
     profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
+    can_see_jurnal = LabMembership.objects.filter(
+        profile=profile,
+        lab__name__in=LAB_JURNAL_NAMES
+    ).exists()
     return render(request, "api/index.html", {"can_see_jurnal": can_see_jurnal})
 
 @login_required
 def entries_page(request):
     profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
+    can_see_jurnal = LabMembership.objects.filter(
+        profile=profile,
+        lab__name__in=LAB_JURNAL_NAMES
+    ).exists()
     return render(request, "api/entries.html", {"can_see_jurnal": can_see_jurnal})
 
 def get_visible_labs(user):
@@ -224,8 +243,11 @@ def create_work_entry(request):
         profile = user.userprofile
         lab_id = data.get("lab")
 
-        can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
-        if not can_see_jurnal or str(lab_id) != "2":
+        can_see_jurnal = LabMembership.objects.filter(
+            profile=profile,
+            lab__name__in=LAB_JURNAL_NAMES
+        ).exists()
+        if not can_see_jurnal:
             data.pop("jurnal", None)
             data.pop("scurta_descriere_jurnal", None)
 
@@ -291,10 +313,11 @@ def create_work_entry(request):
             if membership is not None
             else profile.monthly_hour_limit
         )
+        remaining = limit - existing_hours
 
         if existing_hours + new_hours > limit:
             return JsonResponse(
-                {"error": "Monthly hour limit exceeded"},
+                {"error": f"Ți-ai atins limita lunară. Mai poți introduce doar {remaining} ore."},
                 status=400
             )
 
@@ -327,7 +350,10 @@ def monthly_user_entries(request):
     
     lab_id = request.GET.get("lab")
     profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
+    can_see_jurnal = LabMembership.objects.filter(
+        profile=profile,
+        lab__name__in=LAB_JURNAL_NAMES
+    ).exists()
 
     entries = WorkEntry.objects.filter(
         user=request.user,
@@ -355,7 +381,7 @@ def monthly_user_entries(request):
                     "jurnal": e.jurnal or "",
                     "scurta_descriere_jurnal": e.scurta_descriere_jurnal or "",
                 }
-                if (can_see_jurnal and str(lab_id) == "2")
+                if (can_see_jurnal)
                 else {}
             ),
         }
@@ -384,8 +410,11 @@ def generate_jurnal_docx(request):
         return JsonResponse({"error": "Invalid month/year"}, status=400)
 
     profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(lab_id=2, profile=profile).exists()
-    if not can_see_jurnal or str(lab_id) != "2":
+    can_see_jurnal = LabMembership.objects.filter(
+        profile=profile,
+        lab__name__in=LAB_JURNAL_NAMES
+    ).exists()
+    if not can_see_jurnal:
         return HttpResponseForbidden("Nu ai acces la jurnal pentru acest lab.")
 
     try:

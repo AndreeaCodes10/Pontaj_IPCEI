@@ -100,6 +100,10 @@ def update_monthly_hour_limit(request, lab_id, user_id):
 
     return JsonResponse({"status": "ok", "monthly_hour_limit": membership.monthly_hour_limit})
 
+def hours_to_hhmm(hours_float):
+    hours = int(hours_float)
+    minutes = int(round((hours_float - hours) * 60))
+    return f"{hours}:{minutes:02d}"
 
 @login_required
 @require_http_methods(["GET"])
@@ -182,8 +186,13 @@ def generate_anexa1_referat_modificare_docx(request, lab_id, user_id):
     body[2].text = (membership.post or "").strip()
     body[3].text = "UPT"
     body[5].text = str(membership.monthly_hour_limit)
-    body[6].text = f"{membership.monthly_hour_limit/20}"
-    body[7].text = f"16 - {16+(membership.monthly_hour_limit/20)}"
+
+    daily_hours = membership.monthly_hour_limit / 20
+    body[6].text = hours_to_hhmm(daily_hours)
+
+    start_hour = 16
+    end_time = start_hour + daily_hours
+    body[7].text = f"{hours_to_hhmm(start_hour)}-{hours_to_hhmm(end_time)}"
     doc.add_paragraph(f"Salar brut = Total cheltuieli de personal /1,0225 \n \
         Menționez că activitățile ce se vor desfășura în cadrul contractului vor fi detaliate în fișa postului, pentru fiecare persoană. \n \
         De asemenea precizez că plata salariilor și a contribuțiilor datorate către Stat atât pentru angajat cât și pentru angajator\

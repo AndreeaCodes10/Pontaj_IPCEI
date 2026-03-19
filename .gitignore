@@ -21,3 +21,10 @@ build/
 
 .DS_Store
 Thumbs.db
+.env*
+tmp/
+docker-compose.local.yaml
+docker-compose.prod.yml
+Dockerfile
+pontaj_v2-web.tar
+entrypoint.prod.sh

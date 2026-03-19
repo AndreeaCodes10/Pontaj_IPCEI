@@ -12,6 +12,11 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
+
 
 # Firebase is optional in local/dev environments. If `firebase_admin` is not
 # installed, avoid failing Django startup (manage.py check/migrate/etc.).
@@ -22,19 +27,74 @@ except ModuleNotFoundError:
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+REPO_DIR = BASE_DIR.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+def _env_str(name: str, default: str | None = None) -> str | None:
+    value = os.getenv(name, default)
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-=a24m*$dpjq%%ywrh$m)^uxb$y#0r8q=@om)b^=ysb+0=4zv(g'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = _env_str(name)
+    if value is None:
+        return default
+    value = value.lower()
+    if value in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if value in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return default
 
-# ALLOWED_HOSTS = []
-ALLOWED_HOSTS = ['*']
+
+def _env_list(name: str, default: list[str] | None = None) -> list[str]:
+    value = _env_str(name)
+    if value is None:
+        return default or []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _load_dotenv() -> None:
+    dotenv_file = _env_str("DOTENV_FILE")
+    if dotenv_file:
+        load_dotenv(dotenv_file, override=False)
+        return
+
+    django_env = (_env_str("DJANGO_ENV", "local") or "local").lower()
+    if django_env in {"prod", "production"}:
+        candidates = [
+            REPO_DIR / ".env.prod",
+            BASE_DIR / ".env.prod",
+            REPO_DIR / ".env",
+            BASE_DIR / ".env",
+        ]
+    else:
+        candidates = [
+            REPO_DIR / ".env.local",
+            BASE_DIR / ".env.local",
+            REPO_DIR / ".env",
+            BASE_DIR / ".env",
+        ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            load_dotenv(candidate, override=False)
+            return
+
+
+_load_dotenv()
+
+
+SECRET_KEY = _env_str("SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("SECRET_KEY is not set")
+
+DEBUG = _env_bool("DEBUG", default=False)
+
+ALLOWED_HOSTS = _env_list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "[::1]"])
 
 
 # Application definition
@@ -60,13 +120,6 @@ INSTALLED_APPS = [
     "api",
 ]
 
-# REST_FRAMEWORK = {
-#     "DEFAULT_AUTHENTICATION_CLASSES": [
-#         "api.authentication.FirebaseAuthentication",
-#     ]
-# }
-
-
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "api.authentication.DummyAuthentication",
@@ -86,7 +139,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True  # dev only
+CORS_ALLOW_ALL_ORIGINS = _env_bool("CORS_ALLOW_ALL_ORIGINS", default=DEBUG)
+if not CORS_ALLOW_ALL_ORIGINS:
+    CORS_ALLOWED_ORIGINS = _env_list("CORS_ALLOWED_ORIGINS")
 
 ROOT_URLCONF = 'backend.urls'
 
@@ -109,16 +164,59 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
+LOGIN_URL = _env_str("LOGIN_URL", "/api/login/") or "/api/login/"
+LOGIN_REDIRECT_URL = _env_str("LOGIN_REDIRECT_URL", "/api/app/") or "/api/app/"
+LOGOUT_REDIRECT_URL = _env_str("LOGOUT_REDIRECT_URL", "/api/login/") or "/api/login/"
+
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+DATABASE_URL = _env_str("DATABASE_URL")
+if DATABASE_URL:
+    parsed = urlparse(DATABASE_URL)
+    if parsed.scheme in {"postgres", "postgresql"}:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": (parsed.path or "").lstrip("/"),
+                "USER": parsed.username or "",
+                "PASSWORD": parsed.password or "",
+                "HOST": parsed.hostname or "",
+                "PORT": str(parsed.port or ""),
+                "CONN_MAX_AGE": int(_env_str("DB_CONN_MAX_AGE", "60") or "60"),
+            }
+        }
+    elif parsed.scheme in {"sqlite", "sqlite3"}:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": parsed.path,
+            }
+        }
+    else:
+        raise ImproperlyConfigured(f"Unsupported DATABASE_URL scheme: {parsed.scheme}")
+else:
+    db_engine = (_env_str("DB_ENGINE") or "").lower()
+    if db_engine in {"postgres", "postgresql"}:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": _env_str("POSTGRES_DB") or _env_str("DB_NAME") or "postgres",
+                "USER": _env_str("POSTGRES_USER") or _env_str("DB_USER") or "postgres",
+                "PASSWORD": _env_str("POSTGRES_PASSWORD") or _env_str("DB_PASSWORD") or "",
+                "HOST": _env_str("POSTGRES_HOST") or _env_str("DB_HOST") or "db",
+                "PORT": _env_str("POSTGRES_PORT") or _env_str("DB_PORT") or "5432",
+                "CONN_MAX_AGE": int(_env_str("DB_CONN_MAX_AGE", "60") or "60"),
+            }
+        }
+    else:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "db.sqlite3",
+            }
+        }
 
 
 # Password validation
@@ -155,4 +253,19 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = _env_str("STATIC_ROOT") or (BASE_DIR / "staticfiles")
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = _env_str("MEDIA_ROOT") or (BASE_DIR / "media")
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+CSRF_TRUSTED_ORIGINS = _env_list("CSRF_TRUSTED_ORIGINS", default=[])
+
+if not DEBUG:
+    USE_X_FORWARDED_HOST = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", default=False)
+    SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=True)
+    CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", default=True)

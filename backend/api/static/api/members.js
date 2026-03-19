@@ -105,7 +105,7 @@ const Members = {
                         btn.textContent = "Save";
                     }, 800);
 
-                    if (user?.lab_role === "director") {
+                    if (user?.lab_role === "director" || user?.global_role === "admin") {
                         const ok = window.confirm('Generezi acum documentul "ANEXA 1 Referat Modificare"?');
                         if (ok) {
                             const url = `/api/labs/${labId}/members/${uid}/monthly-hour-limit/anexa1-docx/`;

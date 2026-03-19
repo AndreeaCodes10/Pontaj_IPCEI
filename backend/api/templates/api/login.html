@@ -20,6 +20,7 @@
 <div class="login-container">
 <form method="POST">
     {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next|default:'' }}">
     <label>Username:</label>
     <input type="text" name="username"><br><br>
 

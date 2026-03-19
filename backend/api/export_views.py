@@ -11,6 +11,25 @@ import zipfile
 from io import BytesIO
 from collections import defaultdict
 from openpyxl.comments import Comment
+from openpyxl.utils import range_boundaries
+
+def is_merged_cell(ws, row, col):
+    for merged_range in ws.merged_cells.ranges:
+        min_col, min_row, max_col, max_row = range_boundaries(str(merged_range))
+        if min_row <= row <= max_row and min_col <= col <= max_col:
+            return not (row == min_row and col == min_col)
+    return False
+
+def merge_center(ws, start_row, start_col, end_row, end_col, value=None, fill=None, font=None):
+    ws.merge_cells(start_row=start_row, start_column=start_col, end_row=end_row, end_column=end_col)
+    cell = ws.cell(start_row, start_col)
+    if value is not None:
+        cell.value = value
+    if fill is not None:
+        cell.fill = fill
+    if font is not None:
+        cell.font = font
+    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
 def months_to_RO(month):
     lunile = ["ianuarie","februarie", "martie", "aprile",
@@ -121,13 +140,16 @@ def autofit_sheet(ws):
         ws.row_dimensions[row_cells[0].row].height = min(220, max_lines * 16)
 
 
-LAB_JURNAL_ID = 2
-
+LAB_JURNAL_NAMES = ["Lab1", "Lab2"]
 
 def should_show_jurnal_field(profile):
     if not profile:
         return False
-    return LabMembership.objects.filter(lab_id=LAB_JURNAL_ID, profile=profile).exists()
+
+    return LabMembership.objects.filter(
+        profile=profile,
+        lab__name__in=LAB_JURNAL_NAMES
+    ).exists()
 
 
 def AG_workbook(lab, month, year, show_jurnal=False):
@@ -369,6 +391,12 @@ def mipe_workbook(lab, users, month, year, director):
     # Create a sheet for each user
     for user in users:
         ws = wb.create_sheet(title=f"{user.first_name}{user.last_name}")
+        membership_by_user_id = {
+        m.profile.user_id: m
+        for m in LabMembership.objects.filter(lab=lab, profile__user__in=users).select_related(
+            "profile__user"
+        )
+    }
 
         # HEADER
         ws["B2"] = "Anexa 1"
@@ -380,6 +408,8 @@ def mipe_workbook(lab, users, month, year, director):
         ws["B6"] = "Numele şi prenumele persoană"
         ws["B7"] = "CNP"
         ws["B8"] = "Funcția în Proiect¹"
+        membership = membership_by_user_id.get(user.id)
+        ws["F8"] = (membership.post or "") if membership else ""
         ws["B9"] = "Corespondenta cu HG Nr. 1188/2022 (50/35/25/15 euro)/Corespodența cu plafonul" \
                     " prevăzut în Ghidul Solicitantului/corespondenta cu Legea 153/2017"
         ws["B10"] = "Echivalent în lei a Limitei maxime în  euro/oră se calculează la cursul de " \
@@ -795,16 +825,12 @@ def conti_workbook(lab, users, month, year, director):
             date__month=month
         ).select_related("activitate")
 
-        for i in range(1,nr_Activitati+1):
-            r = start+i
-            ws.cell(r,1,f"A{i}").font = bold
-            ws.cell(row=r, column=1).alignment = center_wrapped
-
         # Fill the activity description block from admin-maintained Activitate.descriere.
         for i, act in enumerate(activitati):
             r = start + 1 + i
-            ws.cell(r, 2, (act.denumire_activitate or "").strip() or act.nume)
+            ws.cell(r, 2, (act.denumire_activitate).strip())
             ws.cell(row=r, column=2).alignment = center_wrapped
+
             ws.cell(r, 3, act.descriere)
             ws.cell(row=r, column=3).alignment = center_wrapped
             act_id = act.id
@@ -820,8 +846,17 @@ def conti_workbook(lab, users, month, year, director):
             comm_cell = ws.cell(r, 7, comentarii_by_act.get(act_id, ""))
             comm_cell.alignment = center_wrapped
 
+        for i in range(1,9):    
+            r = start+i
+            ws.cell(r,1,f"A{i}").font = bold
+            ws.cell(row=r, column=1).alignment = center_wrapped
+            if ws.cell(row=r, column=2).value is None:
+                ws.cell(row=r, column=2, value = "NU ESTE CAZUL").alignment = center_wrapped
+
+
+
         # Thin borders for the activitati block
-        activitati_end_row = start + nr_Activitati
+        activitati_end_row = start + 8
         last_activitati_col = 7
         apply_border(ws, start, 1, activitati_end_row, last_activitati_col, thickness="thin")
 
@@ -833,12 +868,12 @@ def conti_workbook(lab, users, month, year, director):
         ws.cell(row=r0, column=1).alignment = center_wrapped
 
         ws.cell(r0,2,"ACTIVITATI").font=bold
-        ws.merge_cells(start_row=r0,start_column=2,end_row=r0,end_column=9)
+        ws.merge_cells(start_row=r0,start_column=2,end_row=r0,end_column=2*nr_Activitati+1)
         ws.cell(row=r0, column=2).alignment = center_wrapped
 
-        ws.cell(r0,10,"TOTAL").font=bold
-        ws.merge_cells(start_row=r0,start_column=10,end_row=r0+2,end_column=10)
-        ws.cell(row=r0, column=10).alignment = center_wrapped
+        ws.cell(r0,2*nr_Activitati+2,"TOTAL").font=bold
+        ws.merge_cells(start_row=r0,start_column=2*nr_Activitati+2,end_row=r0+2,end_column=2*nr_Activitati+2)
+        ws.cell(row=r0, column=2*nr_Activitati+2).alignment = center_wrapped
 
         # headers A1-A4
         for i in range(len(activitati)):
@@ -854,19 +889,18 @@ def conti_workbook(lab, users, month, year, director):
             ws.cell(row=r0+2, column=col, value="nr ore").alignment=center
             ws.cell(row=r0+2, column=col+1, value="interval").alignment=center
 
-        hours = {}
-        durata = {}
+        hours = defaultdict(float)
+        durata = defaultdict(list)
 
         for e in entries:
             key = (e.activitate_id, e.date.day)
-            hours[key] = e.nr_ore
-            durata[key] = e.durata
+            hours[key] += e.nr_ore
+            durata[key].append(str(e.durata))
 
         total_month = 0
         totals_activitate = {act.id: 0 for act in activitati}
 
         # days loop
-        #va trebui inlocuit lab cu activitate
         for d in range(1,days+1):
 
             row = r0+2+d
@@ -879,7 +913,8 @@ def conti_workbook(lab, users, month, year, director):
                 col = 2+i*2
 
                 h = hours.get((act_id, d), "")
-                dur = durata.get((act_id, d), "")
+                dur_list = durata.get((act_id, d), [])
+                dur = ", ".join(dur_list) if dur_list else ""
 
                 ws.cell(row,col,h).alignment=center
                 ws.cell(row,col+1,dur).alignment=center
@@ -888,7 +923,7 @@ def conti_workbook(lab, users, month, year, director):
                     total_day += h
                     totals_activitate[act_id] += h
 
-            ws.cell(row,10,total_day)
+            ws.cell(row,nr_Activitati*2+2,total_day)
 
             total_month += total_day
 
@@ -901,10 +936,10 @@ def conti_workbook(lab, users, month, year, director):
             ws.cell(end, col, totals_activitate[act_id])
             
 
-        ws.cell(end,10,total_month).font=bold
+        ws.cell(end,nr_Activitati*2+2,total_month).font=bold
 
         # borders
-        apply_border(ws, r0, 1, end, 10, thickness="thin")
+        apply_border(ws, r0, 1, end, nr_Activitati*2+2, thickness="thin")
                 
         ws.cell(end+5,2,"Aprobat,")
         ws.cell(end+6,2,f"Responsabil laborator in cercetare-proiectare\n"
@@ -919,7 +954,9 @@ def conti_workbook(lab, users, month, year, director):
         ws.merge_cells(start_row=end+6,start_column=8,end_row=end+6,end_column=11)
         ws.cell(end+8,8,f"Semnătura")
         for r in range(1, end+9):
-            for c in range(1,12):
+            for c in range(1,nr_Activitati*2+4):
+                if is_merged_cell(ws, r, c):
+                    continue
                 ws.cell(row=r, column=c).fill = wb_fill
 
         # auto‑size sheet
@@ -977,7 +1014,7 @@ def export_excel(request):
     )
 
     show_jurnal = should_show_jurnal_field(profile)
-    include_ag = show_jurnal and lab.id == LAB_JURNAL_ID
+    include_ag = show_jurnal and lab.name in LAB_JURNAL_NAMES
 
     wb_AG = AG_workbook(lab, month, year, show_jurnal=show_jurnal) if include_ag else None
     wb_upt = upt_workbook(lab,users,month,year,director_user)

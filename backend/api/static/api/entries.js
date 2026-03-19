@@ -52,7 +52,9 @@ const Entries = {
         }
 
         // Render the table shell once; sorting only re-renders <tbody>.
-        const showJurnal = !!window.canSeeJurnal && String(window.currentLabId) === "2";
+        // const showJurnal = !!window.canSeeJurnal && String(window.currentLabId) === "2";
+        const showJurnal = !!window.canSeeJurnal;
+
         container.innerHTML = `
             <div class="entries-table-container">
             <table class="entries-table">
@@ -98,7 +100,8 @@ const Entries = {
     renderBody() {
         const tbody = document.querySelector("#userEntries tbody");
         if (!tbody) return;
-        const showJurnal = !!window.canSeeJurnal && String(window.currentLabId) === "2";
+        // const showJurnal = !!window.canSeeJurnal && String(window.currentLabId) === "2";
+        const showJurnal = !!window.canSeeJurnal;
 
         tbody.innerHTML = this.entries.map(e => `
             <tr>
