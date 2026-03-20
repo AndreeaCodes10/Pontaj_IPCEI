@@ -261,7 +261,7 @@ def upt_workbook(lab, users, month, year, director):
     bold = Font(bold=True)
     center_wrapped = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    weekend_fill = PatternFill(start_color="E82F32", end_color="E82F32", fill_type="solid")
+    weekend_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="lightHorizontal")
 
     last_col = days_in_month + 2
 
@@ -275,36 +275,45 @@ def upt_workbook(lab, users, month, year, director):
     # Create a sheet for each user
     for user in users:
         ws = wb.create_sheet(title=f"{user.first_name}{user.last_name}")
+        activitati = list(lab.activitati.all().order_by("id"))
+        activitate_index = {act.id: i for i, act in enumerate(activitati)}
 
         # HEADER
         ws["A1"] = "Universitatea Politehnica Timișoara"
-        ws["A2"] = "Departamentul Electronică Aplicată"
+        ws["A2"] = f"IPCEI - Laboratorul L{lab.name[-1]}"
 
-        ws["A4"] = "FOAIE INDIVIDUALĂ DE PREZENȚĂ - EVIDENȚA NUMĂRULUI DE ORE LUCRATE (PONTAJ)"
-        ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=last_col)
-        ws.cell(row=4, column=1).alignment = center
+        ws["A7"] = "FOAIE INDIVIDUALĂ DE PREZENȚĂ - EVIDENȚA NUMĂRULUI DE ORE LUCRATE (PONTAJ)"
+        ws.merge_cells(start_row=7, start_column=1, end_row=7, end_column=last_col)
+        ws.cell(row=7, column=1).alignment = center
 
-        ws["A5"] = f"Laborator: {lab.name}"
-        ws.merge_cells(start_row=5, start_column=1, end_row=5, end_column=last_col)
-        ws.cell(row=5, column=1).alignment = center
+        ws["A8"] = "Titlul proiectului: \"Investiția 14. Proiecte transfrontaliere și multinaționale – Procesoare cu consum redus de energie și cipuri semiconductoare \", Componenta C9. Suport pentru sectorul privat, cercetare, dezvoltare și inovare,\n \
+              Pilonul III. Creștere inteligentă, sustenabilă și favorabilă incluziunii, inclusiv coeziune economică, locuri de muncă, productivitate, competitivitate, cercetare, dezvoltare și inovare, precum și o piață internă funcțională,\n" \
+              " cu întreprinderi mici și mijlocii (IMM-uri) puternice – Subproiectul cu titlul „ Traductoare inteligente eficiente din punct de vedere energetic pentru sisteme auto – inovație de-a lungul lanțului valoric (ASSET-IxC –UPT)\" "
+        ws.merge_cells(start_row=8, start_column=1, end_row=8, end_column=last_col)
+        ws.cell(row=8, column=1).alignment = center
 
-        ws["A6"] = f"{month_name} {year}"
-        ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=last_col)
-        ws.cell(row=6, column=1).alignment = center
+        ws["A9"] = "Nr. Ordine 5.PI/I4/C9"
+        ws.merge_cells(start_row=9, start_column=1, end_row=9, end_column=last_col)
+        ws.cell(row=9, column=1).alignment = center
 
-        row = 8
+        ws["A10"] = f"{month_name} {year}"
+        ws.merge_cells(start_row=10, start_column=1, end_row=10, end_column=last_col)
+        ws.cell(row=10, column=1).font = bold
+        ws.cell(row=10, column=1).alignment = center
 
-        ws.cell(row=row, column=1, value="Nume și prenume cadru didactic")
+        row = 12
+
+        ws.cell(row=row, column=1, value="Nume și prenume cadru didactic/salariat").font = bold
         ws.merge_cells(start_row=row, start_column=1, end_row=row+1, end_column=1)
         ws.cell(row=row, column=1).alignment = center_wrapped
 
         ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=last_col-1)
 
-        ws.cell(row=row+2, column=1, value=f"{user.last_name} {user.first_name}")
+        ws.cell(row=row+2, column=1, value=f"{user.last_name.upper()} {user.first_name}").font = bold
         ws.merge_cells(start_row=row+2, start_column=1, end_row=row+5, end_column=1)
         ws.cell(row=row+2, column=1).alignment = center_wrapped
 
-        ws.cell(row=row+6, column=1, value="Total ore")
+        ws.cell(row=row+6, column=1, value="Total ore lucrate:").font = bold
         ws.cell(row=row+6, column=1).alignment = center_wrapped
 
         # DAYS HEADER
@@ -312,15 +321,15 @@ def upt_workbook(lab, users, month, year, director):
             weekday = calendar.weekday(year, month, d)
             col = d + 1
 
-            cell = ws.cell(row=row+1, column=col, value=f"{d}\n{month_name}")
+            cell = ws.cell(row=row+1, column=col, value=f"{d}\n{month_name[:3]}.")
             cell.alignment = center
             cell.font = bold
 
             if weekday >= 5:
-                for r in range(row+1, row+7):
+                for r in range(row+2, row+6):
                     ws.cell(row=r, column=col).fill = weekend_fill
 
-        ws.cell(row=row, column=days_in_month+2, value="Semnătura")
+        ws.cell(row=row, column=days_in_month+2, value="Semnătură")
         ws.merge_cells(start_row=row, start_column=days_in_month+2, end_row=row+1, end_column=days_in_month+2)
         ws.cell(row=row, column=days_in_month+2).alignment = center
 
@@ -334,25 +343,42 @@ def upt_workbook(lab, users, month, year, director):
             date__month=month
         )
 
-        durata_by_day = {}
-        hours_by_day = {}
+        hours = defaultdict(float)
+        durata = defaultdict(list)
 
         for e in entries:
-            durata_by_day[e.date.day] = e.durata
-            hours_by_day[e.date.day] = e.nr_ore
-
-        for d in range(1, days_in_month+1):
-            ws.cell(row=row+2, column=d+1, value=durata_by_day.get(d, ""))
+            key = (e.activitate_id, e.date.day)
+            hours[key] += e.nr_ore
+            durata[key].append(str(e.durata))
 
         total = 0
-        for d in range(1, days_in_month+1):
-            h = hours_by_day.get(d, "")
-            ws.cell(row=row+6, column=d+1, value=h)
+        for d in range(1, days_in_month + 1):
+            daily_hours_sum = 0
+            intervaluri_durata = []
 
-            if isinstance(h, (int, float)):
-                total += h
+            # Sort activities by index to maintain deterministic order
+            sorted_acts = sorted(activitate_index.items(), key=lambda x: x[1])
 
-        ws.cell(row=row+6, column=days_in_month+2, value=total)
+            for act_id, i in sorted_acts:
+                h = hours.get((act_id, d), 0)
+                if isinstance(h, (int, float)):
+                    daily_hours_sum += h
+                dur_list = durata.get((act_id, d), [])
+                intervaluri_durata.extend(dur_list)
+
+            intervaluri_durata.sort(key=lambda x: int(x.split('-')[0].replace(':', '')) if '-' in x and ':' in x.split('-')[0] else 0)
+
+            for idx, dur_val in enumerate(intervaluri_durata):
+                row_offset = min(idx, 3)  # Use max 4 rows (offsets 0-3)
+                target_row = row + 2 + row_offset
+                current_val = ws.cell(row=target_row, column=d + 1).value
+                new_val = f"{current_val}\n{dur_val}" if (idx >= 4 and current_val) else dur_val
+                ws.cell(row=target_row, column=d + 1, value=new_val).alignment = center
+
+            ws.cell(row=row + 6, column=d + 1, value=daily_hours_sum).font = bold
+            total += daily_hours_sum
+
+        ws.cell(row=row + 6, column=days_in_month + 2, value=total).font = bold
 
         for r in range(row, row+7):
             for c in range(1, last_col+1):
@@ -362,15 +388,15 @@ def upt_workbook(lab, users, month, year, director):
         autofit_sheet(ws)
 
         final_row = row + 8
-        ws.cell(row=final_row, column=1, value="Director/Responsabil Proiect Cercetare")
-        ws.cell(row=final_row+1, column=1, value=f"Prof. dr. {director.last_name} {director.first_name}")
+        ws.cell(row=final_row, column=1, value="Manager proiect").alignment = center_wrapped
+        ws.cell(row=final_row+1, column=1, value="Conf.univ.dr.ing. Ionel Raul-Ciprian").alignment = center_wrapped
 
         ws.cell(row=final_row, column=last_col-2, value="Întocmit,")
-        ws.cell(row=final_row+1, column=last_col-2, value=f"Prof. dr. {director.last_name} {director.first_name}")
+        ws.cell(row=final_row+1, column=last_col-2, value=f"Prof. dr. {director.first_name} {director.last_name.upper()}")
 
     return wb
 
-def mipe_workbook(lab, users, month, year, director):
+def mipe_workbook(lab, users, month, year):
     days_in_month = calendar.monthrange(year, month)[1]
     month_name = months_to_RO(month)
 
@@ -391,12 +417,25 @@ def mipe_workbook(lab, users, month, year, director):
     # Create a sheet for each user
     for user in users:
         ws = wb.create_sheet(title=f"{user.first_name}{user.last_name}")
+        
+        # Pre-fetch membership for the current lab to fill header info (Job title etc.)
         membership_by_user_id = {
-        m.profile.user_id: m
-        for m in LabMembership.objects.filter(lab=lab, profile__user__in=users).select_related(
-            "profile__user"
-        )
-    }
+            m.profile.user_id: m
+            for m in LabMembership.objects.filter(lab=lab, profile__user__in=users).select_related(
+                "profile__user"
+            )
+        }
+
+        # Find all labs (contracts) for this user to create columns
+        user_memberships = LabMembership.objects.filter(profile__user=user).select_related('lab').order_by('lab__id')
+        user_labs = [m.lab for m in user_memberships]
+        
+        # Fallback if user has no labs (should not happen if they are in the list)
+        if not user_labs:
+            user_labs = [lab]
+            
+        nr_labs = len(user_labs)
+        lab_index = {l.id: i for i, l in enumerate(user_labs)}
 
         # HEADER
         ws["B2"] = "Anexa 1"
@@ -434,8 +473,6 @@ def mipe_workbook(lab, users, month, year, director):
             ws.merge_cells(start_row=q, start_column=6, end_row=q, end_column=9)
             ws.cell(row=8, column=6).alignment = center_wrapped
 
-        # Contracts section
-        num_contracts = 3  # TODO: Replace with dynamic endpoint call
 
         # Row 12 - Contract headers
         ws.merge_cells(start_row=12, start_column=2, end_row=13, end_column=2)
@@ -444,21 +481,21 @@ def mipe_workbook(lab, users, month, year, director):
         ws.cell(row=12, column=2).font = bold
 
 
-        for i in range(num_contracts):
+        for i in range(nr_labs):
             start_col = 3 + (i * 2)
             end_col = start_col + 1
             ws.merge_cells(start_row=12, start_column=start_col, end_row=12, end_column=end_col)
             ws.cell(row=12, column=start_col, value=f"Contract Individual de Muncă/Act administrativ de numire. {i+1} ²")
             ws.cell(row=12, column=start_col).alignment = center_wrapped
 
-        total_col = 3 + (num_contracts * 2)
+        total_col = 3 + (nr_labs * 2)
         ws.merge_cells(start_row=12, start_column=total_col, end_row=13, end_column=total_col)
         ws.cell(row=12, column=total_col, value="Total ore lucrate/zi")
         ws.cell(row=12, column=total_col).alignment = center_wrapped
         ws.cell(row=12, column=total_col).font = bold
 
         # Row 13 - Contract details
-        for i in range(num_contracts):
+        for i in range(nr_labs):
             col1 = 3 + (i * 2)
             col2 = col1 + 1
             ws.cell(row=13, column=col1, value="nr ore lucrate")
@@ -470,27 +507,25 @@ def mipe_workbook(lab, users, month, year, director):
 
         row = 14
         col = 1
-        activitati = list(lab.activitati.all().order_by('id')[:num_contracts])
-        activitate_index = {act.id: i for i, act in enumerate(activitati)}
 
         # FETCH ENTRIES
         entries = WorkEntry.objects.filter(
             user=user,
-            lab=lab,
+            lab__in=user_labs,
             date__year=year,
             date__month=month
-        ).select_related("lab")
+        )
 
-        hours = {}
-        durata = {}
+        hours = defaultdict(float)
+        durata = defaultdict(list)
 
         for e in entries:
-            key = (e.activitate_id, e.date.day)
-            hours[key] = e.nr_ore
-            durata[key] = e.durata
+            key = (e.lab_id, e.date.day)
+            hours[key] += e.nr_ore
+            durata[key].append(str(e.durata))
 
         total_month = 0
-        totals_activitate = {act.id: 0 for act in activitati}
+        totals_lab = {l.id: 0 for l in user_labs}
 
         # DAYS HEADER
         for d in range(1, days_in_month + 1):
@@ -498,19 +533,23 @@ def mipe_workbook(lab, users, month, year, director):
 
             total_day = 0
 
-            for act_id, i in activitate_index.items():
+            for lab_obj in user_labs:
+                l_id = lab_obj.id
+                i = lab_index[l_id]
 
                 col = 3+i*2
 
-                h = hours.get((act_id, d), "")
-                dur = durata.get((act_id, d), "")
+                h = hours.get((l_id, d), "")
+                dur_list = durata.get((l_id, d), [])
+                dur_list.sort(key=lambda x: int(x.split('-')[0].replace(':', '')) if '-' in x and ':' in x.split('-')[0] else 0)
+                dur_str = "\n".join(dur_list)
 
                 ws.cell(row,col,h).alignment=center
-                ws.cell(row,col+1,dur).alignment=center
+                ws.cell(row,col+1,dur_str).alignment=center
 
                 if isinstance(h,(int,float)):
                     total_day += h
-                    totals_activitate[act_id] += h
+                    totals_lab[l_id] += h
 
             ws.cell(row,total_col,total_day)
 
@@ -520,9 +559,10 @@ def mipe_workbook(lab, users, month, year, director):
         end = row
         ws.cell(end,2,"Nr. total de ore").font=bold
 
-        for act_id, i in activitate_index.items():
+        for lab_obj in user_labs:
+            i = lab_index[lab_obj.id]
             col = 3+i*2
-            ws.cell(end, col, totals_activitate[act_id])
+            ws.cell(end, col, totals_lab[lab_obj.id])
 
         for j in range(1,9):
             ws.merge_cells(start_row=end+j, start_column=2, end_row=end+j, end_column=total_col)
@@ -724,7 +764,6 @@ def conti_workbook(lab, users, month, year, director):
     activitate_index = {act.id: i for i, act in enumerate(activitati)}
     activitate_ids = {act.id for act in activitati}
     nr_Activitati = len(activitati)
-
 
     meta_entries = WorkEntry.objects.filter(
         user=director,
@@ -1019,7 +1058,7 @@ def export_excel(request):
     wb_AG = AG_workbook(lab, month, year, show_jurnal=show_jurnal) if include_ag else None
     wb_upt = upt_workbook(lab,users,month,year,director_user)
     conti_user_workbooks, conti_sumary_wb = conti_workbook(lab, users, month, year, director_user)
-    wb_mipe =mipe_workbook(lab,users,month,year,director_user)
+    wb_mipe = mipe_workbook(lab, users, month, year)
 
     AG_buffer = BytesIO() if wb_AG is not None else None
     upt_buffer = BytesIO()
