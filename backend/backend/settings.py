@@ -269,3 +269,15 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", default=False)
     SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=True)
     CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", default=True)
+
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = "pontaj.ipcei@gmail.com"
+EMAIL_HOST_PASSWORD = "brpkevcxwyiogkba"
+
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

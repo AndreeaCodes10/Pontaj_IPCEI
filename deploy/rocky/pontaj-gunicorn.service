@@ -1,0 +1,38 @@
+[Unit]
+Description=Pontaj Django app (Gunicorn)
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=pontaj
+Group=pontaj
+
+# App layout (recommended):
+# - Repo copy:   /srv/pontaj/app
+# - Virtualenv:  /srv/pontaj/venv
+WorkingDirectory=/srv/pontaj/app/backend
+
+Environment=REPO_DIR=/srv/pontaj/app
+Environment=APP_DIR=/srv/pontaj/app/backend
+Environment=VENV_DIR=/srv/pontaj/venv
+Environment=DJANGO_SETTINGS_MODULE=backend.settings
+
+# Put secrets here (do NOT commit this file):
+EnvironmentFile=/etc/pontaj/pontaj.env
+
+# Start script runs migrate + collectstatic before Gunicorn.
+ExecStart=/usr/bin/bash /srv/pontaj/app/deploy/rocky/app-entrypoint.sh
+
+Restart=always
+RestartSec=3
+TimeoutStopSec=30
+KillSignal=SIGQUIT
+
+# Hardening (keep pragmatic; Django often needs network + filesystem)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,58 @@
+:root{
+  --primary:#0a487b;
+  --primary-hover:#0b548f;
+  --secondary-hover:#6F818F;
+  --secondary:#647481;
+  --background:#11304a;
+  --card:#103e65;
+  --entries-card:#11304a;
+  --border:#334155;
+  --text:#d8ebfd;
+  --muted:#cbd5e1;
+}
+
+.form-section{
+  background:#11304a;
+  border-color: #11304a;
+}
+
+.form-section-header p{
+  color:var(--muted);
+  font-size:.85rem;
+}
+select{
+  background-color: var(--card);
+  color:var(--text);
+}
+textarea,input{
+  background-color: var(--card);
+  color:var(--text);
+}
+
+.sidebar{
+  background:#323a41;
+}
+.sidebar-right{
+  background: var(--primary);
+  border-color: #082036;
+}
+.member-row{
+  background:var(--card);
+  border-color: #082036;
+}
+.member-meta{
+  color:var(--text);
+}
+
+.btn-primary{background:var(--primary);color:#fff;flex:1}
+.btn-primary:hover{background:var(--primary-hover)}
+
+.btn-secondary{background:var(--secondary);color:var(--text)}
+.btn-secondary:hover{background:var(--secondary-hover)}
+
+.entries-table-container scrollbar-track{
+  width: 8px;
+  height: 8px;
+  background-color: #082036;
+  color: #000;
+}

@@ -19,13 +19,18 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
     <script src="{% static 'api/export.js' %}"></script>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/style.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
 
     <!-- Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- External CSS -->
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'css/darkstyles.css' %}" id="darkTheme" disabled>
+
+    <script src="{% static 'api/settingsMenu.js' %}"></script>
     
 </head>
 <body>
@@ -45,7 +50,24 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
 
     <span id="authUser" class="auth-user"></span>
     <span id="authRole" class="auth-role"></span>
-
+    <div class="settings-menu">
+        <button type="button" class="settings-btn" aria-label="Settings">
+            <img src="{% static 'icons/user-gear-solid_light_small.png' %}"
+                 alt="Settings"
+                 class="settings-icon">
+        </button>
+        <div class="settings-dropdown">
+            <a href="{% url 'password_reset' %}" class="settings-item">
+                <img src="{% static 'icons/key-solid-small.png' %}" alt="Change Password" class="settings-dropdown-icon">
+                Schimbă parola
+            </a>
+            <div class="settings-divider"></div>
+            <button type="button" class="settings-item" data-action="toggle-theme">
+                <img src="{% static 'icons/circle-half-stroke-solid-small.png' %}" alt="Toggle Theme" class="settings-dropdown-icon">
+                Dark mode: Off
+            </button>
+        </div>
+    </div>
     <button class="logout-btn" id="logoutBtn">
         <img src="{% static 'icons/logout.png' %}" alt="Logout" class="logout-icon">
     </button>
@@ -75,9 +97,15 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
         <div class="progress-container">
             <div id="progressBar" class="progress-bar"></div>
         </div>
-        <div class="actions">
+        <div class="statistics-nav">
             <button id="openEntriesPage" class="btn-secondary">
                 Vezi activitățile mele
+            </button>
+            <button id="openMembersHoursPage" class="btn-secondary" style="display:none;">
+                Vezi orele membrilor
+            </button>
+            <button id="openAnnualStatsPage" class="btn-secondary" style="display:none;">
+                Statistici anuale
             </button>
         </div>
         
@@ -155,18 +183,18 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
             <div class="form-group" id="generatedJurnalGroup" style="display:none;">
                 <label for="jurnalMonth">Luna Jurnal</label>
                 <div class="inline-month-actions">
-                    <input type="month" id="jurnalMonth">
+                    <input type="text" id="jurnalMonth" data-month-picker="true">
                     <button type="button" id="generateJurnalBtn" class="btn-secondary">Genereaza Jurnal (Word)</button>
                 </div>
             </div>
             {% endif %}
 
             </div>
-
-            <div class="form-section" id="monthlySection" style="display:none;">
-                <div class="form-section-header">
-                    <h3>Lunar</h3>
-                </div>
+            
+        <div class="form-section" id="monthlySection" style="display:none;">
+            <div class="form-section-header">
+                <h3>Lunar</h3>
+            </div>
 
             <div class="form-group" id="linksGroup">
                 <label for="links">Links</label>
@@ -183,13 +211,23 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
                 <textarea id="comentarii" placeholder="Observații..."></textarea>
             </div>
 
+            <div class="form-group">
+                <label for="exportMonth">Luna</label>
+                <div class="inline-month-actions">
+                    <input type="text" id="exportMonth" data-month-picker="true">
+                    <button type="button" id="saveMonthlyBtn" class="btn-secondary">Salvează lunar</button>
+                    <button type="button" id="exportBtn" class="btn-secondary" style="display:none;">Export Excel</button>
+                </div>
             </div>
-        <input type="hidden" id="total_hours">
-        <div class="actions">
-            <button type="submit" form="workEntryForm" class="btn-primary">Salvează</button>
-            <input type="month" id="exportMonth">
-            <button type="button" id="exportBtn" class="btn-secondary" style="display:none;">Export Excel</button>
         </div>
+
+        <input type="hidden" id="total_hours">
+        <div class="actions actions-stacked">
+            <button type="button" id="toggleMonthlyBtn" class="btn-secondary">Lunar</button>
+            <button type="submit" form="workEntryForm" class="btn-primary">Salvează</button>
+        </div>
+
+        
     
     </form>
     </div>

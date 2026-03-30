@@ -12,6 +12,14 @@
 <title>My Entries</title>
 
 <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+<link rel="stylesheet" href="{% static 'css/darkstyles.css' %}" id="darkTheme" disabled>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/style.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
+<script src="{% static 'api/monthPickers.js' %}"></script>
+<script src="{% static 'api/settingsMenu.js' %}"></script>
 
 <script>
     window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
@@ -33,10 +41,23 @@
     <h1 class="app-title">Pontaj App</h1>
 
     <div id="authArea" class="auth-area">
-        <button onclick="window.location.href='/api/app'" class="btn-secondary">
-        ← Back to Dashboard</button>
+        <button onclick="window.location.href='/api/app'" class="home-btn">
+            <img src="{% static 'icons/home.png' %}" alt="Home" class="home-icon">
+        </button>
         <span id="authUser" class="auth-user"></span>
         <span id="authRole" class="auth-role"></span>
+        <div class="settings-menu">
+            <button type="button" class="settings-btn" aria-label="Settings">
+                <img src="{% static 'icons/user-gear-solid_light_small.png' %}"
+                     alt="Settings"
+                     class="settings-icon">
+            </button>
+            <div class="settings-dropdown">
+                <a href="{% url 'password_reset' %}" class="settings-item">Schimbă parola</a>
+                <div class="settings-divider"></div>
+                <button type="button" class="settings-item" data-action="toggle-theme">Dark mode: Off</button>
+            </div>
+        </div>
         <button class="logout-btn" id="logoutBtn">
             <img src="{% static 'icons/logout.png' %}" alt="Logout" class="logout-icon">
         </button>
@@ -49,7 +70,7 @@
 
             <div class="entries-card">
 
-                <h2>My Monthly Entries</h2>
+                <h2>Pontajul Meu Lunar</h2>
 
                 <div class="filters-row">
 
@@ -59,8 +80,8 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="monthSelect">Month</label>
-                        <input type="month" id="monthSelect">
+                        <label for="monthSelect">Luna</label>
+                        <input type="text" id="monthSelect" data-month-picker="true">
                     </div>
                 </div>
                 <div id="userEntries"></div>

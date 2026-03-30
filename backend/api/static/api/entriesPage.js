@@ -28,6 +28,10 @@ const EntriesPage = {
             monthInput.value = now.toISOString().slice(0,7);
         }
 
+        if (typeof MonthPickers !== "undefined") {
+            MonthPickers.init();
+        }
+
         if (labParam) {
             labSelect.value = labParam;
         }

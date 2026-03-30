@@ -109,3 +109,24 @@ class WorkEntry(models.Model):
             f"{self.lab.name} | "
             f"{self.date}"
         )
+
+
+class MonthlyMeta(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
+    activitate = models.ForeignKey(Activitate, on_delete=models.PROTECT)
+
+    year = models.IntegerField()
+    month = models.IntegerField()
+
+    livrabil = models.TextField(blank=True, default="")
+    comentarii = models.TextField(blank=True, default="")
+    links = models.TextField(blank=True, default="")
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "lab", "activitate", "year", "month")
+
+    def __str__(self):
+        return f"{self.user} | {self.lab.name} | {self.activitate.nume} | {self.month:02d}/{self.year}"

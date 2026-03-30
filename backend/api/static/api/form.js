@@ -6,12 +6,27 @@ const Form = {
         this.nrOreInput = document.getElementById("nr_ore");
         this.durataInput = document.getElementById("durata");
         this.monthlySection = document.getElementById("monthlySection");
+        this.toggleMonthlyBtn = document.getElementById("toggleMonthlyBtn");
+        this.monthlyMonthInput = document.getElementById("exportMonth");
+        this.saveMonthlyBtn = document.getElementById("saveMonthlyBtn");
         this.linksGroup = document.getElementById("linksGroup");
         this.livrabilGroup = document.getElementById("livrabilGroup");
         this.comentariiGroup = document.getElementById("comentariiGroup");
         this.generateJurnalBtn = document.getElementById("generateJurnalBtn");
         this.canEditMonthly = true;
+        this.isMonthlyOpen = false;
         this.attachEvents();
+        this.setDefaultMonthlyMonth();
+        this.applyMonthlyVisibility();
+    },
+
+    setDefaultMonthlyMonth() {
+        if (!this.monthlyMonthInput) return;
+        if (this.monthlyMonthInput.value) return;
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        this.monthlyMonthInput.value = `${yyyy}-${mm}`;
     },
 
     attachEvents() {
@@ -24,6 +39,32 @@ const Form = {
         this.nrOreInput?.addEventListener("input", onRecalc);
 
         this.generateJurnalBtn?.addEventListener("click", () => this.generateJurnal());
+
+        this.toggleMonthlyBtn?.addEventListener("click", () => {
+            this.isMonthlyOpen = !this.isMonthlyOpen;
+            this.applyMonthlyVisibility();
+            if (this.isMonthlyOpen) this.loadMonthlyMeta({ silent: true });
+        });
+
+        this.saveMonthlyBtn?.addEventListener("click", () => this.saveMonthlyMeta());
+
+        this.monthlyMonthInput?.addEventListener("change", () => this.loadMonthlyMeta({ silent: true }));
+
+        document.getElementById("lab")?.addEventListener("change", () => {
+            if (this.isMonthlyOpen) this.loadMonthlyMeta({ silent: true });
+        });
+        document.getElementById("activitate")?.addEventListener("change", () => {
+            if (this.isMonthlyOpen) this.loadMonthlyMeta({ silent: true });
+        });
+    },
+
+    applyMonthlyVisibility() {
+        if (this.monthlySection) {
+            this.monthlySection.style.display = this.isMonthlyOpen ? "block" : "none";
+        }
+        if (this.toggleMonthlyBtn) {
+            this.toggleMonthlyBtn.textContent = this.isMonthlyOpen ? "Închide lunar" : "Lunar";
+        }
     },
 
     convertToBackendDate(dmy) {
@@ -105,15 +146,14 @@ const Form = {
         }
 
         const monthInput = document.getElementById("jurnalMonth")?.value || "";
-        let month;
-        let year;
-        if (monthInput) {
-            const parts = monthInput.split("-"); // YYYY-MM
-            year = parseInt(parts[0], 10);
-            month = parseInt(parts[1], 10);
-        } else {
-            ({ month, year } = this.getMonthYearFromDateInput());
+        if (!monthInput) {
+            alert("Selectează luna pentru jurnal.");
+            return;
         }
+
+        const parts = monthInput.split("-"); // YYYY-MM
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
 
         if (!Number.isFinite(month) || !Number.isFinite(year)) {
             alert("Selecteaza luna pentru jurnal.");
@@ -146,44 +186,108 @@ const Form = {
     },
 
     applyPermissions(user) {
-        const canEditMonthly =
-            user?.global_role === "admin" || user?.lab_role === "director";
+        this.canEditMonthly = !!user?.username;
+    },
 
-        this.canEditMonthly = !!canEditMonthly;
+    hasMonthlyValues() {
+        const links = document.getElementById("links")?.value || "";
+        const livrabil = document.getElementById("livrabil")?.value || "";
+        const comentarii = document.getElementById("comentarii")?.value || "";
+        return !!(links.trim() || livrabil.trim() || comentarii.trim());
+    },
 
-        const currentLabName = Labs.labMap && window.currentLabId
-            ? Labs.labMap[window.currentLabId]
-            : null;
+    getMonthYearFromMonthInput() {
+        const monthInput = this.monthlyMonthInput?.value || "";
+        if (!monthInput) return null;
+        const [yearStr, monthStr] = monthInput.split("-");
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+        if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
+        return { year, month };
+    },
 
-        const canSeeJurnalForLab =
-            !!(user?.can_see_jurnal ?? window.canSeeJurnal) &&
-            ["Lab1", "Lab2"].includes(currentLabName);
-        console.log("currentLabId:", window.currentLabId);
-        console.log("currentLabName:", currentLabName);
-        console.log("can_see_jurnal:", user?.can_see_jurnal);
-        console.log("canSeeJurnal:", window.canSeeJurnal);
-        console.log("canSeeJurnalForLab:", canSeeJurnalForLab);
+    getMonthlyContext() {
+        const labId = window.currentLabId || document.getElementById("lab")?.value;
+        const activitateId = document.getElementById("activitate")?.value;
+        const my = this.getMonthYearFromMonthInput();
 
-        const showMonthlySection = this.canEditMonthly || canSeeJurnalForLab;
+        return {
+            labId,
+            activitateId,
+            month: my?.month,
+            year: my?.year
+        };
+    },
 
-        if (this.monthlySection) {
-            this.monthlySection.style.display = showMonthlySection ? "block" : "none";
+    async loadMonthlyMeta({ silent = false } = {}) {
+        const ctx = this.getMonthlyContext();
+        if (!ctx.labId || !ctx.activitateId || !ctx.month || !ctx.year) {
+            if (!silent) alert("Selectează lab, activitate și luna.");
+            return;
         }
 
-        const showMonthlyFields = this.canEditMonthly;
-        if (this.linksGroup) this.linksGroup.style.display = showMonthlyFields ? "flex" : "none";
-        if (this.livrabilGroup) this.livrabilGroup.style.display = showMonthlyFields ? "flex" : "none";
-        if (this.comentariiGroup) this.comentariiGroup.style.display = showMonthlyFields ? "flex" : "none";
+        const url =
+            `/api/monthly-meta/?lab=${encodeURIComponent(ctx.labId)}` +
+            `&activitate=${encodeURIComponent(ctx.activitateId)}` +
+            `&month=${encodeURIComponent(ctx.month)}` +
+            `&year=${encodeURIComponent(ctx.year)}`;
 
-        if (!showMonthlyFields) {
-            const linksEl = document.getElementById("links");
-            const livrabilEl = document.getElementById("livrabil");
-            const comentariiEl = document.getElementById("comentarii");
-
-            if (linksEl) linksEl.value = "";
-            if (livrabilEl) livrabilEl.value = "";
-            if (comentariiEl) comentariiEl.value = "";
+        const res = await fetch(url, { credentials: "same-origin" });
+        if (!res.ok) {
+            if (!silent) alert("Eroare la încărcarea câmpurilor lunare.");
+            return;
         }
+
+        const data = await res.json();
+        const linksEl = document.getElementById("links");
+        const livrabilEl = document.getElementById("livrabil");
+        const comentariiEl = document.getElementById("comentarii");
+
+        if (linksEl) linksEl.value = data?.links ?? "";
+        if (livrabilEl) livrabilEl.value = data?.livrabil ?? "";
+        if (comentariiEl) comentariiEl.value = data?.comentarii ?? "";
+    },
+
+    async saveMonthlyMeta({ silent = false } = {}) {
+        const ctx = this.getMonthlyContext();
+        if (!ctx.labId || !ctx.activitateId || !ctx.month || !ctx.year) {
+            if (!silent) alert("Selectează lab, activitate și luna.");
+            return;
+        }
+
+        const payload = {
+            lab: ctx.labId,
+            activitate: ctx.activitateId,
+            month: ctx.month,
+            year: ctx.year,
+            links: document.getElementById("links")?.value || "",
+            livrabil: document.getElementById("livrabil")?.value || "",
+            comentarii: document.getElementById("comentarii")?.value || ""
+        };
+
+        const res = await fetch("/api/monthly-meta/", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": Auth.getCSRFToken()
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            let msg = "Eroare la salvarea câmpurilor lunare.";
+            try {
+                const data = await res.json();
+                if (data?.error) msg = data.error;
+            } catch {
+                // ignore
+            }
+            if (!silent) alert(msg);
+            return;
+        }
+
+        if (!silent) alert("Salvat lunar.");
     },
 
     async submit(e) {
@@ -258,6 +362,9 @@ const Form = {
 
         if (response.ok) {
             const lab = document.getElementById("lab").value;  // capture BEFORE reset
+            if (this.hasMonthlyValues()) {
+                await this.saveMonthlyMeta({ silent: true });
+            }
 
             alert("Saved successfully!");
             this.form.reset();

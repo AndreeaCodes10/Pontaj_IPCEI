@@ -5,7 +5,7 @@ const Export = {
     },
 
     applyPermissions(user) {
-        const canExport = user.lab_role === "director" || user.global_role === "admin";
+        const canExport = !!user?.username;
 
         if (!this.exportBtn || !this.exportMonth) return;
 

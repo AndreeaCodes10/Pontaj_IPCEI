@@ -57,7 +57,23 @@ const Auth = {
 
             logoutBtn.addEventListener("click", () => this.logout());
 
-            Export.applyPermissions(user);
+            if (typeof Export !== "undefined" && Export?.applyPermissions) {
+                Export.applyPermissions(user);
+            }
+
+            const membersHoursBtn = document.getElementById("openMembersHoursPage");
+            if (membersHoursBtn) {
+                const canSeeMembersHours =
+                    user.lab_role === "director" || user.global_role === "admin";
+                membersHoursBtn.style.display = canSeeMembersHours ? "inline-block" : "none";
+            }
+
+            const annualStatsBtn = document.getElementById("openAnnualStatsPage");
+            if (annualStatsBtn) {
+                const canSeeAnnualStats =
+                    user.lab_role === "director" || user.global_role === "admin";
+                annualStatsBtn.style.display = canSeeAnnualStats ? "inline-block" : "none";
+            }
 
         });
     }

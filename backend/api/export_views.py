@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side 
-from .models import Lab, LabMembership, User, WorkEntry
+from .models import Lab, LabMembership, User, WorkEntry, MonthlyMeta
 from .excel_utils import apply_border
 import zipfile
 from io import BytesIO
@@ -152,9 +152,8 @@ def should_show_jurnal_field(profile):
     ).exists()
 
 
-def AG_workbook(lab, month, year, show_jurnal=False):
-
-    users = list(User.objects.all().order_by("last_name"))
+def AG_workbook(lab, users, month, year, show_jurnal=False):
+    users = sorted(list(users), key=lambda u: u.last_name)
     wb = Workbook()
     ws = wb.active
     ws.title = "Pontaj"
@@ -206,12 +205,15 @@ def AG_workbook(lab, month, year, show_jurnal=False):
         full_name = f"{user.first_name} {user.last_name}"
         ws.cell(row=1, column=col_idx).comment = Comment(full_name, "")
 
-    entries = WorkEntry.objects.select_related(
-        "user", "lab", "activitate"
-    ).filter(
-        lab=lab,
-        date__year=year,
-        date__month=month
+    entries = (
+        WorkEntry.objects.select_related("user", "lab", "activitate")
+        .filter(
+            lab=lab,
+            user__in=users,
+            date__year=year,
+            date__month=month,
+        )
+        .order_by("date", "id")
     )
 
     for e in entries:
@@ -392,7 +394,7 @@ def upt_workbook(lab, users, month, year, director):
         ws.cell(row=final_row+1, column=1, value="Conf.univ.dr.ing. Ionel Raul-Ciprian").alignment = center_wrapped
 
         ws.cell(row=final_row, column=last_col-2, value="Întocmit,")
-        ws.cell(row=final_row+1, column=last_col-2, value=f"Prof. dr. {director.first_name} {director.last_name.upper()}")
+        ws.cell(row=final_row+1, column=last_col-2, value=f"{user.last_name} {user.first_name}")
 
     return wb
 
@@ -759,33 +761,10 @@ def conti_workbook(lab, users, month, year, director):
     color = Font(color="C00000", bold=True)
     wb_fill = PatternFill(start_color="DAF2D0", end_color="DAF2D0", fill_type="solid") 
 
-    # Shared (director-entered) monthly fields are the same for every user sheet.
     activitati = list(lab.activitati.all().order_by("id"))
     activitate_index = {act.id: i for i, act in enumerate(activitati)}
     activitate_ids = {act.id for act in activitati}
     nr_Activitati = len(activitati)
-
-    meta_entries = WorkEntry.objects.filter(
-        user=director,
-        lab=lab,
-        date__year=year,
-        date__month=month
-    ).select_related("activitate").order_by("date", "id")
-
-    links_by_act = {}
-    livrabile_by_act = {}
-    comentarii_by_act = {}
-
-    for e in meta_entries:
-        act_id = e.activitate_id
-        if act_id not in activitate_ids:
-            continue
-        if e.links:
-            links_by_act[act_id] = str(e.links).strip()
-        if e.livrabil:
-            livrabile_by_act[act_id] = str(e.livrabil).strip()
-        if e.comentarii:
-            comentarii_by_act[act_id] = str(e.comentarii).strip()
 
     membership_by_user_id = {
         m.profile.user_id: m
@@ -856,13 +835,50 @@ def conti_workbook(lab, users, month, year, director):
             ws.cell(start,c).font = bold
             ws.cell(start,c).alignment = center_wrapped
 
-        # User entries for the daily table.
-        entries = WorkEntry.objects.filter(
+        entries = (
+            WorkEntry.objects.filter(
+                user=user,
+                lab=lab,
+                date__year=year,
+                date__month=month,
+            )
+            .select_related("activitate")
+            .order_by("date", "id")
+        )
+
+        # Monthly fields (links/livrabile/comentarii) are now user-entered and saved
+        # separately from daily entries.
+        links_by_act = {}
+        livrabile_by_act = {}
+        comentarii_by_act = {}
+
+        metas = MonthlyMeta.objects.filter(
             user=user,
             lab=lab,
-            date__year=year,
-            date__month=month
-        ).select_related("activitate")
+            month=month,
+            year=year,
+            activitate_id__in=list(activitate_ids),
+        )
+        for m in metas:
+            if m.links:
+                links_by_act[m.activitate_id] = str(m.links).strip()
+            if m.livrabil:
+                livrabile_by_act[m.activitate_id] = str(m.livrabil).strip()
+            if m.comentarii:
+                comentarii_by_act[m.activitate_id] = str(m.comentarii).strip()
+
+        # Backwards-compatible fallback: if no MonthlyMeta exists for an activity yet,
+        # take the latest non-empty values from that user's daily entries.
+        for e in entries:
+            act_id = e.activitate_id
+            if act_id not in activitate_ids:
+                continue
+            if act_id not in links_by_act and e.links:
+                links_by_act[act_id] = str(e.links).strip()
+            if act_id not in livrabile_by_act and e.livrabil:
+                livrabile_by_act[act_id] = str(e.livrabil).strip()
+            if act_id not in comentarii_by_act and e.comentarii:
+                comentarii_by_act[act_id] = str(e.comentarii).strip()
 
         # Fill the activity description block from admin-maintained Activitate.descriere.
         for i, act in enumerate(activitati):
@@ -990,7 +1006,7 @@ def conti_workbook(lab, users, month, year, director):
         ws.cell(end+5,8,"Aprobat,")
         ws.cell(end+6,8,f"Responsabil AUMOVIO pentru activitatea {lab.name[-1]},")
         ws.cell(end+7,8,f"----Nume angajat conti----")
-        ws.merge_cells(start_row=end+6,start_column=8,end_row=end+6,end_column=11)
+        ws.merge_cells(start_row=end+6,start_column=8,end_row=end+6,end_column=9)
         ws.cell(end+8,8,f"Semnătura")
         for r in range(1, end+9):
             for c in range(1,nr_Activitati*2+4):
@@ -1028,18 +1044,13 @@ def export_excel(request):
     lab = get_object_or_404(Lab, id=lab_id_int)
 
     is_admin = profile.role == "admin"
+    if not is_admin:
+        is_member = LabMembership.objects.filter(lab=lab, profile=profile).exists()
+        if not is_member:
+            return HttpResponseForbidden()
 
-    is_director = LabMembership.objects.filter(
-        lab=lab,
-        profile=profile,
-        role="director"
-    ).exists()
-
-    if not (is_admin or is_director):
-        return HttpResponseForbidden()
-
-    memberships = LabMembership.objects.filter(lab=lab).select_related("profile__user")
-    users = sorted([m.profile.user for m in memberships], key=lambda u: u.last_name)
+    # Every user exports only their own sheets.
+    users = [request.user]
 
     director_membership = (
         LabMembership.objects.filter(lab=lab, role="director")
@@ -1055,7 +1066,7 @@ def export_excel(request):
     show_jurnal = should_show_jurnal_field(profile)
     include_ag = show_jurnal and lab.name in LAB_JURNAL_NAMES
 
-    wb_AG = AG_workbook(lab, month, year, show_jurnal=show_jurnal) if include_ag else None
+    wb_AG = AG_workbook(lab, users, month, year, show_jurnal=show_jurnal) if include_ag else None
     wb_upt = upt_workbook(lab,users,month,year,director_user)
     conti_user_workbooks, conti_sumary_wb = conti_workbook(lab, users, month, year, director_user)
     wb_mipe = mipe_workbook(lab, users, month, year)
@@ -1075,12 +1086,6 @@ def export_excel(request):
         if AG_buffer is not None:
             z.writestr("pontaj_tabel_AG.xlsx", AG_buffer.getvalue())
         z.writestr(f"pontaj_poli_{lab.name}_{month}_{year}.xlsx",upt_buffer.getvalue())
-        conti_sumary_buffer = BytesIO()
-        conti_sumary_wb.save(conti_sumary_buffer)
-        z.writestr(
-            f"pontaj_conti_sumary_{lab.name}_{month}_{year}.xlsx",
-            conti_sumary_buffer.getvalue(),
-        )
         for user, wb in conti_user_workbooks:
             user_buffer = BytesIO()
             wb.save(user_buffer)

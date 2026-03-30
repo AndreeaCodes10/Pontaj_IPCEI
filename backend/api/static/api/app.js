@@ -1,10 +1,37 @@
 const App = {
     init() {
+        this.initMonthPickers();
         Labs.init();
         Calendar.init();
         Form.init();
         Auth.init();
         Export.init();
+    },
+
+    initMonthPickers() {
+        if (typeof MonthPickers !== "undefined" && MonthPickers?.init) {
+            MonthPickers.init();
+            return;
+        }
+
+        if (typeof flatpickr !== "function") return;
+        if (typeof monthSelectPlugin !== "function") return;
+
+        document.querySelectorAll('input[data-month-picker="true"]').forEach((el) => {
+            if (!el || el._flatpickr) return;
+
+            flatpickr(el, {
+                disableMobile: true,
+                plugins: [
+                    new monthSelectPlugin({
+                        shorthand: true,
+                        dateFormat: "Y-m",
+                        altFormat: "F Y",
+                        theme: "light"
+                    })
+                ]
+            });
+        });
     }
 };
 
@@ -25,6 +52,35 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.location.href = `/api/entries/?lab=${lab}&month=${month}&year=${year}`;
+    });
+
+    document.getElementById("openMembersHoursPage")?.addEventListener("click", () => {
+        const lab = document.getElementById("lab")?.value;
+        const date = document.getElementById("date")?.value;
+
+        let month = new Date().getMonth() + 1;
+        let year = new Date().getFullYear();
+
+        if (date) {
+            const parts = date.split("-");
+            month = parts[1];
+            year = parts[2];
+        }
+
+        window.location.href = `/api/members-hours/?lab=${lab}&month=${month}&year=${year}`;
+    });
+
+    document.getElementById("openAnnualStatsPage")?.addEventListener("click", () => {
+        const lab = document.getElementById("lab")?.value;
+        const date = document.getElementById("date")?.value;
+
+        let year = new Date().getFullYear();
+        if (date) {
+            const parts = date.split("-");
+            year = parts[2];
+        }
+
+        window.location.href = `/api/annual-stats/?lab=${lab}&year=${year}`;
     });
 });
 
