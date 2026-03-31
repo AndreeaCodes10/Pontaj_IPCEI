@@ -362,10 +362,6 @@ const Form = {
 
         if (response.ok) {
             const lab = document.getElementById("lab").value;  // capture BEFORE reset
-            if (this.hasMonthlyValues()) {
-                await this.saveMonthlyMeta({ silent: true });
-            }
-
             alert("Saved successfully!");
             this.form.reset();
 

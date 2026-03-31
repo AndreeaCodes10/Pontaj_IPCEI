@@ -575,6 +575,33 @@ def create_work_entry(request):
             if members:
                 users = User.objects.filter(id__in=members)
                 entry.members.set(users)
+
+            # If monthly fields are present (non-empty), also persist them to MonthlyMeta
+            # for the entry's month/year so the "Salvează" button saves both Zilnic + Lunar.
+            monthly_links = str(data.get("links") or "").strip()
+            monthly_livrabil = str(data.get("livrabil") or "").strip()
+            monthly_comentarii = str(data.get("comentarii") or "").strip()
+
+            if monthly_links or monthly_livrabil or monthly_comentarii:
+                meta, _ = MonthlyMeta.objects.get_or_create(
+                    user=user,
+                    lab_id=lab_id,
+                    activitate=entry.activitate,
+                    month=month,
+                    year=year,
+                )
+                changed = False
+                if monthly_links and meta.links != monthly_links:
+                    meta.links = monthly_links
+                    changed = True
+                if monthly_livrabil and meta.livrabil != monthly_livrabil:
+                    meta.livrabil = monthly_livrabil
+                    changed = True
+                if monthly_comentarii and meta.comentarii != monthly_comentarii:
+                    meta.comentarii = monthly_comentarii
+                    changed = True
+                if changed:
+                    meta.save()
             return JsonResponse(serializer.data, status=201)
 
         print("SERIALIZER ERRORS:", serializer.errors)

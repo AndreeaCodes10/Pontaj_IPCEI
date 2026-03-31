@@ -53,7 +53,10 @@
                      class="settings-icon">
             </button>
             <div class="settings-dropdown">
-                <a href="{% url 'password_reset' %}" class="settings-item">Schimbă parola</a>
+                <a href="{% url 'password_reset' %}" class="settings-item">
+                    <img src="{% static 'icons/key-solid-small.png' %}" alt="Change Password" class="settings-dropdown-icon">
+                    Schimbă parola
+                </a>
                 <div class="settings-divider"></div>
                 <button type="button" class="settings-item" data-action="toggle-theme">Dark mode: Off</button>
             </div>
