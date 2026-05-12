@@ -11,9 +11,9 @@ class LabMembershipInline(admin.TabularInline):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "role", "monthly_hour_limit")
+    list_display = ("user", "role", "user_id_code", "monthly_hour_limit")
     list_filter = ("role",)
-    search_fields = ("user__username",)
+    search_fields = ("user__username", "user_id_code")
     inlines = [LabMembershipInline]
 
 @admin.register(LabMembership)
@@ -24,7 +24,7 @@ class LabMembershipAdmin(admin.ModelAdmin):
     
 @admin.register(Lab)
 class LabAdmin(admin.ModelAdmin):
-    list_display = ("name", "titlu")
+    list_display = ("name", "titlu", "responsabil_aumovio")
     inlines = [ActivitateInline]
 
 
@@ -40,7 +40,6 @@ class WorkEntryAdmin(admin.ModelAdmin):
         "user",
         "lab",
         "activitate",
-        "individual",
         "date",
         "nr_ore",
         "durata",
@@ -50,6 +49,5 @@ class WorkEntryAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "lab",
-        "individual",
         "date",
     )

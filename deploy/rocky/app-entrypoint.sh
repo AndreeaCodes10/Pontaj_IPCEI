@@ -18,7 +18,12 @@ GUNICORN_LOG_LEVEL="${GUNICORN_LOG_LEVEL:-info}"
 
 cd "$APP_DIR"
 
-"$VENV_DIR/bin/python" manage.py migrate --noinput
+RUN_MIGRATIONS_ON_STARTUP="${RUN_MIGRATIONS_ON_STARTUP:-true}"
+if [[ "$RUN_MIGRATIONS_ON_STARTUP" == "true" ]]; then
+  "$VENV_DIR/bin/python" manage.py migrate --noinput
+else
+  echo "Skipping migrate because RUN_MIGRATIONS_ON_STARTUP=$RUN_MIGRATIONS_ON_STARTUP"
+fi
 "$VENV_DIR/bin/python" manage.py collectstatic --noinput
 
 exec "$VENV_DIR/bin/gunicorn" backend.wsgi:application \
@@ -28,4 +33,5 @@ exec "$VENV_DIR/bin/gunicorn" backend.wsgi:application \
   --log-level "$GUNICORN_LOG_LEVEL" \
   --access-logfile - \
   --error-logfile -
+
 

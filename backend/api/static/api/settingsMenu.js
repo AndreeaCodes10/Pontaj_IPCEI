@@ -21,9 +21,6 @@ const SettingsMenu = {
             document.getElementById("lab"),
             document.getElementById("activitate"),
             document.getElementById("livrabil"), // This is an input field
-            document.getElementById("individual"),
-            document.getElementById("jurnal"), // This is a textarea
-            document.getElementById("scurta_descriere_jurnal"), // This is a textarea
             document.getElementById("comentarii"), // This is a textarea
             document.getElementById("links"), // This is a textarea
             ...document.querySelectorAll(".member-limit-input"), // From members.js, these are number inputs

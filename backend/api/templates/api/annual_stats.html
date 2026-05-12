@@ -11,9 +11,6 @@
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
     <link rel="stylesheet" href="{% static 'css/darkstyles.css' %}" id="darkTheme" disabled>
 
-    <script>
-        window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
-    </script>
     <script src="{% static 'api/auth.js' %}"></script>
     <script src="{% static 'api/settingsMenu.js' %}"></script>
 </head>

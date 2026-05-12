@@ -8,6 +8,7 @@ from django.dispatch import receiver
 class Lab(models.Model):
     name = models.CharField(max_length=100, unique=True)
     titlu = models.CharField(max_length=255, blank=True, default="")
+    responsabil_aumovio = models.CharField(max_length=255, blank=True, default="")
     
     def __str__(self):
         return self.name
@@ -20,6 +21,7 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="member")
+    user_id_code = models.CharField(max_length=255, blank=True, default="")
     monthly_hour_limit = models.IntegerField(default=40)
     labs = models.ManyToManyField("Lab", through="LabMembership", blank=True)
 
@@ -38,6 +40,7 @@ class LabMembership(models.Model):
 
     monthly_hour_limit = models.IntegerField(default=40)
     post = models.CharField(max_length=255, blank=True, default="")
+    signature_png = models.BinaryField(blank=True, null=True)
 
     class Meta:
         unique_together = ("profile", "lab")
@@ -87,9 +90,6 @@ class WorkEntry(models.Model):
 
     # Common fields
     livrabil = models.TextField(blank=True, default="")
-    jurnal = models.TextField(blank=True, default="")
-    scurta_descriere_jurnal = models.TextField(blank=True, default="")
-    individual = models.BooleanField(default=False)
     members = models.ManyToManyField(User, blank=True, related_name="shared_entries")
 
     date = models.DateField(default=timezone.now)

@@ -6,10 +6,7 @@ const Labs = {
         // Kept as "subSelect" to minimize downstream changes from the old subactivitate UI.
         this.subSelect = document.getElementById("activitate");
         this.livrabilSelect = document.getElementById("livrabil");
-        this.individualSelect = document.getElementById("individual");
-        this.jurnalGroup = document.getElementById("jurnalGroup");
-        this.scurtaDescriereJurnalGroup = document.getElementById("scurtaDescriereJurnalGroup");
-        this.generatedJurnalGroup = document.getElementById("generatedJurnalGroup");
+        this.signatureGroup = document.getElementById("signatureGroup");
 
         this.attachEvents();
         this.loadLabs();
@@ -43,28 +40,17 @@ const Labs = {
             window.currentLabId = labId;
             if (!labId) return;
             const user = await Auth.getCurrentUser(labId);
-            if (typeof user?.can_see_jurnal !== "undefined") {
-                window.canSeeJurnal = !!user.can_see_jurnal;
-            }
-
-            if (this.jurnalGroup) {
-                this.jurnalGroup.style.display =
-                    window.canSeeJurnal && ["Lab1", "Lab2"].includes(this.labMap[labId])? "block": "none";
-            }
-            if (this.scurtaDescriereJurnalGroup) {
-                this.scurtaDescriereJurnalGroup.style.display =
-                    window.canSeeJurnal && ["Lab1", "Lab2"].includes(this.labMap[labId])? "block": "none";
-            }
-            if (this.generatedJurnalGroup) {
-                this.generatedJurnalGroup.style.display =
-                    window.canSeeJurnal && ["Lab1", "Lab2"].includes(this.labMap[labId])? "block": "none";
-            }
             Members.applyLabPermissions(user);
             Form.applyPermissions(user);
             Members.loadLabMembers(labId);
             Auth.loadAuthArea(labId); 
             await this.loadActivitati(labId);
             Calendar.loadCalendarForLab(labId);
+
+            if (this.signatureGroup) {
+                const labName = this.labMap[labId] || "";
+                this.signatureGroup.style.display = labName === "Lab2" ? "block" : "none";
+            }
         });
 
         if (this.subSelect) {
@@ -77,28 +63,9 @@ const Labs = {
                     descriereInput.value = selected.dataset.descriere || "";
                 }
 
-                // Activitate no longer carries livrabil/individual; only set these if present.
+                // Activitate no longer carries livrabil; only set this if present.
                 if (this.livrabilSelect && selected.dataset.livrabil) {
                     this.livrabilSelect.value = selected.dataset.livrabil;
-                }
-
-                if (this.individualSelect && selected.dataset.individual) {
-                    this.individualSelect.value =
-                        selected.dataset.individual === "true" ? "true" : "false";
-                }
-            });
-        }
-
-        if (this.individualSelect) {
-            this.individualSelect.addEventListener("change", () => {
-                const membersBox = document.getElementById("membersContainer");
-
-                if (!membersBox) return;
-
-                if (this.individualSelect.value === "false") {
-                    membersBox.style.display = "flex";
-                } else {
-                    membersBox.style.display = "none";
                 }
             });
         }
@@ -120,4 +87,3 @@ const Labs = {
         });
     }
 };
-

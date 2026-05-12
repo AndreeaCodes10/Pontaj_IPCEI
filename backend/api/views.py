@@ -2,7 +2,6 @@ from django.http import JsonResponse
 from .models import Lab, LabMembership, Activitate, UserProfile, WorkEntry, MonthlyMeta
 from django.views.decorators.csrf import csrf_exempt
 import json
-from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
@@ -25,8 +24,6 @@ from openpyxl.styles import PatternFill, Alignment, Font
 from openpyxl.styles.borders import Border, Side
 from io import BytesIO
 from . import export_views
-
-LAB_JURNAL_NAMES = ["Lab1", "Lab2"]
 
 def _is_admin(user):
     return getattr(getattr(user, "userprofile", None), "role", None) == "admin"
@@ -168,11 +165,6 @@ def current_user(request):
     lab_id = request.GET.get("lab")
 
     lab_role = None
-    can_see_jurnal = LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES
-    ).exists()
-    print("CAN SEE JURNAL:", can_see_jurnal)
 
     if lab_id:
         try:
@@ -188,27 +180,16 @@ def current_user(request):
         "username": request.user.username,
         "global_role": profile.role,
         "lab_role": lab_role,
-        "can_see_jurnal": can_see_jurnal,
     })
 
 
 @login_required
 def index(request):
-    profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES
-    ).exists()
-    return render(request, "api/index.html", {"can_see_jurnal": can_see_jurnal})
+    return render(request, "api/index.html")
 
 @login_required
 def entries_page(request):
-    profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES
-    ).exists()
-    return render(request, "api/entries.html", {"can_see_jurnal": can_see_jurnal})
+    return render(request, "api/entries.html")
 
 @login_required
 def members_hours_page(request):
@@ -222,12 +203,7 @@ def members_hours_page(request):
     if not (is_admin or is_director_any):
         return HttpResponseForbidden("Nu ai acces la aceasta pagina.")
 
-    can_see_jurnal = LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES,
-    ).exists()
-
-    return render(request, "api/members_hours.html", {"can_see_jurnal": can_see_jurnal})
+    return render(request, "api/members_hours.html")
 
 @login_required
 def annual_stats_page(request):
@@ -242,12 +218,7 @@ def annual_stats_page(request):
     if not (is_admin or is_director_any):
         return HttpResponseForbidden("Nu ai acces la aceasta pagina.")
 
-    can_see_jurnal = LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES,
-    ).exists()
-
-    return render(request, "api/annual_stats.html", {"can_see_jurnal": can_see_jurnal})
+    return render(request, "api/annual_stats.html")
 
 @login_required
 def list_director_labs(request):
@@ -484,6 +455,38 @@ def list_activitati(request, lab_id):
     return JsonResponse(data, safe=False)
 
 
+@login_required
+@require_http_methods(["POST"])
+def upload_signature(request, lab_id):
+    lab = get_object_or_404(Lab, id=lab_id)
+    profile = request.user.userprofile
+
+    membership = LabMembership.objects.filter(profile=profile, lab=lab).first()
+    if membership is None:
+        return HttpResponseForbidden("User not enrolled in this lab")
+
+    file_obj = request.FILES.get("signature")
+    if file_obj is None:
+        return JsonResponse({"error": "Missing signature file."}, status=400)
+
+    name_lower = (file_obj.name or "").lower()
+    content_type = (file_obj.content_type or "").lower()
+    if not name_lower.endswith(".png") and content_type != "image/png":
+        return JsonResponse({"error": "Only PNG files are allowed."}, status=400)
+
+    raw = file_obj.read()
+    if not raw:
+        return JsonResponse({"error": "Empty file."}, status=400)
+    if len(raw) > 3 * 1024 * 1024:
+        return JsonResponse({"error": "PNG too large (max 3 MB)."}, status=400)
+    if not raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        return JsonResponse({"error": "Invalid PNG file."}, status=400)
+
+    membership.signature_png = raw
+    membership.save(update_fields=["signature_png"])
+    return JsonResponse({"status": "ok"})
+
+
 @require_http_methods(["POST"])
 def create_work_entry(request):
     '''Endpoint to create a work entry. Validates that the user is enrolled in the lab and does not exceed monthly hour limit.'''
@@ -495,17 +498,8 @@ def create_work_entry(request):
         profile = user.userprofile
         lab_id = data.get("lab")
 
-        can_see_jurnal = LabMembership.objects.filter(
-            profile=profile,
-            lab__name__in=LAB_JURNAL_NAMES
-        ).exists()
-        if not can_see_jurnal:
-            data.pop("jurnal", None)
-            data.pop("scurta_descriere_jurnal", None)
-
         nr_ore = data.get("nr_ore")
         durata = data.get("durata")
-        members = data.get("members", [])
         if not lab_id:
             return JsonResponse({"error": "Missing lab"}, status=400)
 
@@ -571,10 +565,6 @@ def create_work_entry(request):
 
         if serializer.is_valid():
             entry = serializer.save(user=user)
-
-            if members:
-                users = User.objects.filter(id__in=members)
-                entry.members.set(users)
 
             # If monthly fields are present (non-empty), also persist them to MonthlyMeta
             # for the entry's month/year so the "Salvează" button saves both Zilnic + Lunar.
@@ -722,12 +712,6 @@ def monthly_user_entries(request):
         return JsonResponse({"error": "Invalid month/year"}, status=400)
     
     lab_id = request.GET.get("lab")
-    profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES
-    ).exists()
-
     entries = WorkEntry.objects.filter(
         user=request.user,
         lab_id=lab_id,
@@ -745,153 +729,13 @@ def monthly_user_entries(request):
             "livrabil": e.livrabil or "",
             "durata": e.durata,
             "activity_description": e.activity_description,
-            "individual": e.individual,
-            "members": [u.username for u in e.members.all()],
             "links": e.links,
             "comentarii": e.comentarii,
-            **(
-                {
-                    "jurnal": e.jurnal or "",
-                    "scurta_descriere_jurnal": e.scurta_descriere_jurnal or "",
-                }
-                if (can_see_jurnal)
-                else {}
-            ),
         }
         for e in entries
     ]
 
     return JsonResponse(data, safe=False)
-
-
-@login_required
-def generate_jurnal_docx(request):
-    """
-    Generate a .docx journal for the logged-in user using their own entries.
-    Visibility: only users who can see Jurnal for Lab 2.
-    """
-    lab_id = request.GET.get("lab")
-    month = request.GET.get("month")
-    year = request.GET.get("year")
-    luna = export_views.months_to_RO(int(month))
-
-
-    try:
-        month = int(month)
-        year = int(year)
-    except (TypeError, ValueError):
-        return JsonResponse({"error": "Invalid month/year"}, status=400)
-
-    profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES
-    ).exists()
-    if not can_see_jurnal:
-        return HttpResponseForbidden("Nu ai acces la jurnal pentru acest lab.")
-
-    try:
-        from docx import Document  # type: ignore
-        from docx.oxml import OxmlElement  # type: ignore
-        from docx.oxml.ns import qn  # type: ignore
-        from docx.opc.constants import RELATIONSHIP_TYPE as RT  # type: ignore
-        from docx.shared import Inches, RGBColor  # type: ignore
-        from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
-    except ModuleNotFoundError:
-        return JsonResponse(
-            {"error": "Missing dependency: python-docx. Install it and retry."},
-            status=500,
-        )
-
-    def set_document_font_times_new_roman(document):
-        style = document.styles["Normal"]
-        font = style.font
-        font.name = "Times New Roman"
-        # Ensure the font applies to all script types as well.
-        rfonts = style.element.rPr.rFonts
-        rfonts.set(qn("w:ascii"), "Times New Roman")
-        rfonts.set(qn("w:hAnsi"), "Times New Roman")
-        rfonts.set(qn("w:cs"), "Times New Roman")
-        rfonts.set(qn("w:eastAsia"), "Times New Roman")
-
-    def add_hyperlink(paragraph, url, text):
-        # python-docx doesn't expose hyperlinks directly; construct the XML.
-        part = paragraph.part
-        r_id = part.relate_to(url, RT.HYPERLINK, is_external=True)
-
-        hyperlink = OxmlElement("w:hyperlink")
-        hyperlink.set(qn("r:id"), r_id)
-
-        run = OxmlElement("w:r")
-        r_pr = OxmlElement("w:rPr")
-
-        # Black, underlined link (Word default look, but explicit).
-        color = OxmlElement("w:color")
-        color.set(qn("w:val"), "467886")
-        r_pr.append(color)
-
-        u = OxmlElement("w:u")
-        u.set(qn("w:val"), "single")
-        r_pr.append(u)
-
-        run.append(r_pr)
-        t = OxmlElement("w:t")
-        t.text = text
-        run.append(t)
-        hyperlink.append(run)
-
-        paragraph._p.append(hyperlink)
-
-    entries = (
-        WorkEntry.objects.filter(
-            user=request.user,
-            lab_id=lab_id,
-            date__month=month,
-            date__year=year,
-        )
-        .order_by("date")
-    )
-
-    doc = Document()
-    set_document_font_times_new_roman(doc)
-
-    for e in entries:
-        date_str = f"{e.date.day} {luna} {e.date.year}"
-        durata_str = (e.durata or "").strip()
-
-        line2 = (e.scurta_descriere_jurnal or "").strip()
-        jurnal_value = (e.jurnal or "").strip()
-
-        p1 = doc.add_paragraph()
-        p1.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r1 = p1.add_run(f"{date_str} {durata_str}".strip())
-        r1.bold = True
-        r1.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
-
-        if line2:
-            p2 = doc.add_paragraph()
-            p2.add_run(line2)
-
-        p3 = doc.add_paragraph()
-        p3.add_run("link to my drive: ")
-        if jurnal_value.startswith("http://") or jurnal_value.startswith("https://"):
-            add_hyperlink(p3, jurnal_value, jurnal_value)
-        else:
-            p3.add_run(jurnal_value)
-
-        doc.add_paragraph("")  # spacer
-
-    buf = BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-
-    filename = f"jurnal_lab{lab_id}_{year}-{month:02d}_{request.user.username}.docx"
-    resp = HttpResponse(
-        buf.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
-    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return resp
 
 
 @login_required
@@ -912,7 +756,7 @@ def work_entry_detail(request, entry_id):
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    allowed_fields = {"date", "nr_ore", "durata", "individual", "jurnal", "scurta_descriere_jurnal"}
+    allowed_fields = {"date", "nr_ore", "durata"}
     updates = {k: payload.get(k) for k in allowed_fields if k in payload}
     if not updates:
         return JsonResponse({"error": "No editable fields provided."}, status=400)
@@ -1024,25 +868,6 @@ def work_entry_detail(request, entry_id):
         entry.date = new_date
         entry.nr_ore = new_nr_ore
 
-    if "individual" in updates:
-        raw = updates["individual"]
-        if isinstance(raw, bool):
-            entry.individual = raw
-        else:
-            entry.individual = str(raw).lower() in {"true", "1", "da", "yes"}
-
-    profile = request.user.userprofile
-    can_see_jurnal = LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES
-    ).exists()
-
-    if can_see_jurnal:
-        if "jurnal" in updates:
-            entry.jurnal = str(updates["jurnal"] or "")
-        if "scurta_descriere_jurnal" in updates:
-            entry.scurta_descriere_jurnal = str(updates["scurta_descriere_jurnal"] or "")
-
     entry.save()
 
     resp = {
@@ -1053,17 +878,8 @@ def work_entry_detail(request, entry_id):
         "lab": entry.lab.name if entry.lab else "",
         "activitate": entry.activitate.nume if entry.activitate else "",
         "activity_description": entry.activity_description,
-        "individual": entry.individual,
         "links": entry.links,
         "livrabil": entry.livrabil or "",
         "comentarii": entry.comentarii,
-        **(
-            {
-                "jurnal": entry.jurnal or "",
-                "scurta_descriere_jurnal": entry.scurta_descriere_jurnal or "",
-            }
-            if can_see_jurnal
-            else {}
-        ),
     }
     return JsonResponse(resp)

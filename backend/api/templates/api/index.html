@@ -6,9 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="{% static 'css/letter-p.png' %}">
     <title>Pontaj App</title>
-<script>
-window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
-</script>
     <script src="{% static 'api/auth.js' %}"></script>
     <script src="{% static 'api/utils.js' %}"></script>
     <script src="{% static 'api/members.js' %}"></script>
@@ -132,22 +129,6 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
                 <select id="activitate"></select>
             </div>
 
-           <div class="form-group">
-
-                <label for="individual">Individual</label>
-                <div class="inline-members">
-                <select id="individual">
-                    <option value="true">Da</option>
-                    <option value="false">Nu</option>
-                </select>
-
-                <div id="membersContainer">
-                    <label>Selecteaza Membri</label>
-                    <div id="members"></div>
-                </div>
-                </div>
-            </div>
-
             <div class="row">
                 <div class="form-group">
                     <label for="date">Date</label>
@@ -169,25 +150,6 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
                 <label for="activity_description">Descriere</label>
                 <input type="text" id="activity_description" placeholder="Descriere activitate..." readonly>
             </div>
-            {% if can_see_jurnal %}
-            <div class="form-group" id="jurnalGroup" style="display:none;">
-                <label for="jurnal">Link la Jurnal</label>
-                <textarea id="jurnal" placeholder="Jurnal..."></textarea>
-            </div>
-
-            <div class="form-group" id="scurtaDescriereJurnalGroup" style="display:none;">
-                <label for="scurta_descriere_jurnal">Scurta Descriere Jurnal</label>
-                <textarea id="scurta_descriere_jurnal" placeholder="Scurta descriere..."></textarea>
-            </div>
-
-            <div class="form-group" id="generatedJurnalGroup" style="display:none;">
-                <label for="jurnalMonth">Luna Jurnal</label>
-                <div class="inline-month-actions">
-                    <input type="text" id="jurnalMonth" data-month-picker="true">
-                    <button type="button" id="generateJurnalBtn" class="btn-secondary">Genereaza Jurnal (Word)</button>
-                </div>
-            </div>
-            {% endif %}
 
             </div>
             
@@ -197,7 +159,7 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
             </div>
 
             <div class="form-group" id="linksGroup">
-                <label for="links">Links</label>
+                <label for="links">Working</label>
                 <textarea id="links" placeholder="Link spre Working"></textarea>
             </div>
 
@@ -219,8 +181,12 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
                     <button type="button" id="exportBtn" class="btn-secondary" style="display:none;">Export Excel</button>
                 </div>
             </div>
-        </div>
-
+        <div class="form-group" id="signatureGroup" style="display:none;">
+                <label for="signatureFile">Semnătura PNG</label>
+                <input type="file" id="signatureFile" accept=".png,image/png">
+                <button type="button" id="uploadSignatureBtn" class="btn-secondary">Incarca semnatura</button>
+                <small>Se salvează o singură dată și rămâne până o înlocuiești.</small>
+            </div>       </div>
         <input type="hidden" id="total_hours">
         <div class="actions actions-stacked">
             <button type="button" id="toggleMonthlyBtn" class="btn-secondary">Lunar</button>
@@ -247,3 +213,4 @@ window.canSeeJurnal = {{ can_see_jurnal|yesno:"true,false" }};
 <!-- Future Firebase scripts -->
 </body>
 </html>
+

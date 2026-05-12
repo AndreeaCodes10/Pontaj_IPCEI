@@ -17,8 +17,6 @@ class LabSerializer(serializers.ModelSerializer):
 class WorkEntrySerializer(serializers.ModelSerializer):
     nr_ore = serializers.IntegerField()
     livrabil = serializers.CharField(required=False, allow_blank=True)
-    jurnal = serializers.CharField(required=False, allow_blank=True)
-    scurta_descriere_jurnal = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = WorkEntry
@@ -28,9 +26,6 @@ class WorkEntrySerializer(serializers.ModelSerializer):
             "lab",
             "activitate",
             "livrabil",
-            "jurnal",
-            "scurta_descriere_jurnal",
-            "individual",
             "date",
             "nr_ore",
             "durata",

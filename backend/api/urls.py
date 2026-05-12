@@ -16,6 +16,7 @@ urlpatterns = [
     path("labs/", views.list_labs, name="list-labs"),
     path("director-labs/", views.list_director_labs, name="list-director-labs"),
     path("activitati/<int:lab_id>/", views.list_activitati, name="list-activitati"),
+    path("labs/<int:lab_id>/signature/", views.upload_signature, name="upload-signature"),
     path("work-entry/", views.create_work_entry, name="create-work-entry"),
     # path("send-to-excel/", views.export_work_entries_excel, name="export-work-entries-excel"),
     path("pontaj-dates/", views.get_pontaj_dates, name="get-pontaj-dates"),
@@ -38,7 +39,6 @@ urlpatterns = [
     path("export-monthly-sheet/", export_views.export_excel, name="export-excel"),
     # path("export-monthly-sheet/", export_views.export_work_entries_excel, name="export-work-entries-excel"),
     path("monthly-user-entries/", views.monthly_user_entries, name="monthly-user-entries"),
-    path("generate-jurnal-docx/", views.generate_jurnal_docx, name="generate-jurnal-docx"),
     path("work-entry/<int:entry_id>/", views.work_entry_detail, name="work-entry-detail"),
     path("monthly-meta/", views.monthly_meta, name="monthly-meta"),
 

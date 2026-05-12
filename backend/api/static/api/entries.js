@@ -2,47 +2,23 @@ const Entries = {
     entries: [],
     sortDirections: {},
 
-    renderLinkCell(value) {
-        const v = (value ?? "").toString();
-        return v ? `<a href="${v}" target="_blank">${v}</a>` : "";
-    },
-
-    renderColGroup(showJurnal) {
-        const cols = showJurnal
-            ? [
-                { w: "7%" },  // Data
-                { w: "5%" },  // Nr Ore
-                { w: "7%" },  // Durata
-                { w: "6%" },  // Lab
-                { w: "10%" }, // Activitate
-                { w: "30%" }, // Descriere
-                { w: "6%" },  // Individual
-                { w: "15%" }, // Jurnal
-                { w: "12%" }, // Descriere jurnal
-                { w: "6%" },  // Edit
-                { w: "4%" },  // Delete
-            ]
-            : [
-                { w: "7%" }, // Data
-                { w: "7%" },  // Nr Ore
-                { w: "10%" }, // Durata
-                { w: "8%" },  // Lab
-                { w: "10%" }, // Activitate
-                { w: "48%" }, // Descriere
-                { w: "6%" },  // Individual
-                { w: "6%" },  // Edit
-                { w: "4%" },  // Delete
-            ];
-
+    renderColGroup() {
+        const cols = [
+            { w: "7%" },
+            { w: "7%" },
+            { w: "10%" },
+            { w: "8%" },
+            { w: "10%" },
+            { w: "48%" },
+            { w: "6%" },
+            { w: "4%" },
+        ];
         return `<colgroup>${cols.map(c => `<col style="width:${c.w}">`).join("")}</colgroup>`;
     },
 
     async loadUserEntries(month, year) {
-        const res = await fetch(
-            `/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`
-        );
+        const res = await fetch(`/api/monthly-user-entries/?lab=${window.currentLabId}&month=${month}&year=${year}`);
         const entries = await res.json();
-
         this.entries = Array.isArray(entries) ? entries : [];
 
         const container = document.getElementById("userEntries");
@@ -53,14 +29,10 @@ const Entries = {
             return;
         }
 
-        // Render the table shell once; sorting only re-renders <tbody>.
-        // const showJurnal = !!window.canSeeJurnal && String(window.currentLabId) === "2";
-        const showJurnal = !!window.canSeeJurnal;
-
         container.innerHTML = `
             <div class="entries-table-container">
             <table class="entries-table">
-                ${this.renderColGroup(showJurnal)}
+                ${this.renderColGroup()}
                 <thead>
                     <tr>
                     <th data-sort="date">Data</th>
@@ -69,12 +41,6 @@ const Entries = {
                     <th data-sort="lab">Lab</th>
                     <th data-sort="activitate">Activitate</th>
                     <th data-sort="activity_description">Descriere</th>
-                    <th data-sort="individual">Individual</th>
-                    ${
-                        showJurnal
-                            ? `<th data-sort="jurnal">Jurnal</th><th data-sort="scurta_descriere_jurnal">Descriere jurnal</th>`
-                            : ""
-                    }
                     <th></th>
                     <th></th>
                     </tr>
@@ -91,7 +57,6 @@ const Entries = {
     },
 
     parseDmyToMillis(dmy) {
-        // dmy expected: DD-MM-YYYY
         const parts = String(dmy || "").split("-");
         if (parts.length !== 3) return 0;
         const dd = parseInt(parts[0], 10);
@@ -104,8 +69,6 @@ const Entries = {
     renderBody() {
         const tbody = document.querySelector("#userEntries tbody");
         if (!tbody) return;
-        // const showJurnal = !!window.canSeeJurnal && String(window.currentLabId) === "2";
-        const showJurnal = !!window.canSeeJurnal;
 
         tbody.innerHTML = this.entries.map(e => `
             <tr data-id="${e.id}">
@@ -115,12 +78,6 @@ const Entries = {
                 <td>${e.lab ?? ""}</td>
                 <td>${e.activitate ?? ""}</td>
                 <td>${e.activity_description ?? ""}</td>
-                <td>${e.individual ? "Da" : "Nu"}</td>
-                ${
-                    showJurnal
-                        ? `<td data-field="jurnal">${this.renderLinkCell(e.jurnal)}</td><td data-field="scurta_descriere_jurnal">${e.scurta_descriere_jurnal ?? ""}</td>`
-                        : ""
-                }
                 <td>
                     <button data-id="${e.id}" class="edit-entry">Edit</button>
                     <button data-id="${e.id}" class="save-entry" style="display:none;">Save</button>
@@ -150,9 +107,6 @@ const Entries = {
                     } else if (key === "nr_ore") {
                         valA = Number(valA ?? 0);
                         valB = Number(valB ?? 0);
-                    } else if (key === "individual") {
-                        valA = valA ? 1 : 0;
-                        valB = valB ? 1 : 0;
                     } else {
                         valA = String(valA ?? "");
                         valB = String(valB ?? "");
@@ -171,8 +125,6 @@ const Entries = {
     },
 
     attachEdit() {
-        const showJurnal = !!window.canSeeJurnal;
-
         const parseDmyToIso = (dmy) => {
             const parts = String(dmy || "").trim().split("-");
             if (parts.length !== 3) return null;
@@ -200,18 +152,11 @@ const Entries = {
         const setEditing = (row, enabled) => {
             row.querySelectorAll("td[data-field]").forEach(td => {
                 const field = td.dataset.field;
-                const canEditField =
-                    ["date", "nr_ore", "durata"].includes(field) ||
-                    (showJurnal && ["jurnal", "scurta_descriere_jurnal"].includes(field));
+                const canEditField = ["date", "nr_ore", "durata"].includes(field);
                 if (!canEditField) return;
                 td.contentEditable = enabled ? "true" : "false";
                 td.classList.toggle("is-editing", !!enabled);
-                if (enabled) {
-                    td.dataset.original = td.textContent ?? "";
-                    if (field === "jurnal") {
-                        td.textContent = td.dataset.original ?? "";
-                    }
-                }
+                if (enabled) td.dataset.original = td.textContent ?? "";
             });
 
             const editBtn = row.querySelector(".edit-entry");
@@ -250,7 +195,7 @@ const Entries = {
 
                 const nrOre = parseInt(nrOreRaw || "", 10);
                 if (!Number.isFinite(nrOre) || nrOre < 1 || nrOre > 12) {
-                    alert("Nr. ore trebuie să fie între 1 și 12.");
+                    alert("Nr. ore trebuie sa fie intre 1 si 12.");
                     return;
                 }
 
@@ -260,23 +205,17 @@ const Entries = {
                     return;
                 }
                 if (durH !== nrOre) {
-                    alert("Durata nu corespunde cu nr_ore. Te rog actualizează durata.");
+                    alert("Durata nu corespunde cu nr_ore. Te rog actualizeaza durata.");
                     return;
                 }
 
                 const isoDate = parseDmyToIso(dateDmy);
                 if (!isoDate) {
-                    alert("Data invalidă. Folosește formatul DD-MM-YYYY.");
+                    alert("Data invalida. Foloseste formatul DD-MM-YYYY.");
                     return;
                 }
 
                 const payload = { date: isoDate, nr_ore: nrOre, durata: durata };
-
-                if (showJurnal) {
-                    payload.jurnal = row.querySelector('td[data-field="jurnal"]')?.textContent?.trim() ?? "";
-                    payload.scurta_descriere_jurnal =
-                        row.querySelector('td[data-field="scurta_descriere_jurnal"]')?.textContent?.trim() ?? "";
-                }
 
                 const res = await fetch(`/api/work-entry/${id}/`, {
                     method: "PATCH",
@@ -294,7 +233,6 @@ const Entries = {
                         const data = await res.json();
                         if (data?.error) msg = data.error;
                     } catch {
-                        // ignore
                     }
                     alert(msg);
                     return;
@@ -317,7 +255,7 @@ const Entries = {
             btn.onclick = async () => {
                 const id = btn.dataset.id;
 
-                if (!confirm("Ștergi această înregistrare?")) return;
+                if (!confirm("Stergi aceasta inregistrare?")) return;
 
                 const res = await fetch(`/api/work-entry/${id}/`, {
                     method: "DELETE",
@@ -330,7 +268,7 @@ const Entries = {
                 if (res.ok) {
                     btn.closest("tr").remove();
                 } else {
-                    alert("Eroare la ștergere.");
+                    alert("Eroare la stergere.");
                 }
             };
         });

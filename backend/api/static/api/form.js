@@ -12,7 +12,8 @@ const Form = {
         this.linksGroup = document.getElementById("linksGroup");
         this.livrabilGroup = document.getElementById("livrabilGroup");
         this.comentariiGroup = document.getElementById("comentariiGroup");
-        this.generateJurnalBtn = document.getElementById("generateJurnalBtn");
+        this.signatureFileInput = document.getElementById("signatureFile");
+        this.uploadSignatureBtn = document.getElementById("uploadSignatureBtn");
         this.canEditMonthly = true;
         this.isMonthlyOpen = false;
         this.attachEvents();
@@ -38,8 +39,6 @@ const Form = {
         this.nrOreInput?.addEventListener("change", onRecalc);
         this.nrOreInput?.addEventListener("input", onRecalc);
 
-        this.generateJurnalBtn?.addEventListener("click", () => this.generateJurnal());
-
         this.toggleMonthlyBtn?.addEventListener("click", () => {
             this.isMonthlyOpen = !this.isMonthlyOpen;
             this.applyMonthlyVisibility();
@@ -49,6 +48,7 @@ const Form = {
         this.saveMonthlyBtn?.addEventListener("click", () => this.saveMonthlyMeta());
 
         this.monthlyMonthInput?.addEventListener("change", () => this.loadMonthlyMeta({ silent: true }));
+        this.uploadSignatureBtn?.addEventListener("click", () => this.uploadSignature());
 
         document.getElementById("lab")?.addEventListener("change", () => {
             if (this.isMonthlyOpen) this.loadMonthlyMeta({ silent: true });
@@ -63,7 +63,7 @@ const Form = {
             this.monthlySection.style.display = this.isMonthlyOpen ? "block" : "none";
         }
         if (this.toggleMonthlyBtn) {
-            this.toggleMonthlyBtn.textContent = this.isMonthlyOpen ? "Închide lunar" : "Lunar";
+            this.toggleMonthlyBtn.textContent = this.isMonthlyOpen ? "Inchide lunar" : "Lunar";
         }
     },
 
@@ -89,7 +89,7 @@ const Form = {
         const startTime = this.startTimeInput?.value || "";
         const nrOre = parseInt(this.nrOreInput?.value || "", 10);
         if (!startTime || !Number.isFinite(nrOre) || nrOre <= 0) {
-            alert("CompleteazÄƒ Start Time È™i Nr. ore.");
+            alert("Completeaza Start Time si Nr. ore.");
             return;
         }
 
@@ -99,101 +99,8 @@ const Form = {
             return;
         }
 
-        if (!startTime || !Number.isFinite(nrOre) || nrOre <= 0) {
-            this.durataInput.value = "";
-            return;
-        }
-
         const endTime = this.addHoursToTime(startTime, nrOre);
         this.durataInput.value = `${startTime}-${endTime}`;
-    },
-
-    parseDmyToMillis(dmy) {
-        // dmy expected: DD-MM-YYYY
-        const parts = String(dmy || "").split("-");
-        if (parts.length !== 3) return 0;
-        const dd = parseInt(parts[0], 10);
-        const mm = parseInt(parts[1], 10);
-        const yyyy = parseInt(parts[2], 10);
-        if (!yyyy || !mm || !dd) return 0;
-        return new Date(yyyy, mm - 1, dd).getTime();
-    },
-
-    getMonthYearFromDateInput() {
-        const dateStr = document.getElementById("date")?.value || "";
-        const parts = String(dateStr).split("-"); // DD-MM-YYYY
-        if (parts.length === 3) {
-            const month = parseInt(parts[1], 10);
-            const year = parseInt(parts[2], 10);
-            if (Number.isFinite(month) && Number.isFinite(year)) return { month, year };
-        }
-        const now = new Date();
-        return { month: now.getMonth() + 1, year: now.getFullYear() };
-    },
-
-    async generateJurnal() {
-        const labId = window.currentLabId || document.getElementById("lab")?.value;
-        if (!labId) {
-            alert("Selecteaza un lab.");
-            return;
-        }
-        
-        const labName = Labs.labMap?.[labId];
-
-        if (!["Lab1", "Lab2"].includes(labName)) {
-            alert("Jurnalul se genereaza doar pentru lab1 si lab2.");
-            return;
-        }
-
-        const monthInput = document.getElementById("jurnalMonth")?.value || "";
-        if (!monthInput) {
-            alert("Selectează luna pentru jurnal.");
-            return;
-        }
-
-        const parts = monthInput.split("-"); // YYYY-MM
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-
-        if (!Number.isFinite(month) || !Number.isFinite(year)) {
-            alert("Selecteaza luna pentru jurnal.");
-            return;
-        }
-
-        const url = `/api/generate-jurnal-docx/?lab=${encodeURIComponent(labId)}&month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`;
-
-        const res = await fetch(url, { credentials: "same-origin" });
-        if (!res.ok) {
-            let msg = "Eroare la generarea jurnalului.";
-            try {
-                const data = await res.json();
-                if (data?.error) msg = data.error;
-            } catch {
-                // ignore
-            }
-            alert(msg);
-            return;
-        }
-
-        const blob = await res.blob();
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `jurnal_${year}-${String(month).padStart(2, "0")}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(a.href);
-    },
-
-    applyPermissions(user) {
-        this.canEditMonthly = !!user?.username;
-    },
-
-    hasMonthlyValues() {
-        const links = document.getElementById("links")?.value || "";
-        const livrabil = document.getElementById("livrabil")?.value || "";
-        const comentarii = document.getElementById("comentarii")?.value || "";
-        return !!(links.trim() || livrabil.trim() || comentarii.trim());
     },
 
     getMonthYearFromMonthInput() {
@@ -222,7 +129,7 @@ const Form = {
     async loadMonthlyMeta({ silent = false } = {}) {
         const ctx = this.getMonthlyContext();
         if (!ctx.labId || !ctx.activitateId || !ctx.month || !ctx.year) {
-            if (!silent) alert("Selectează lab, activitate și luna.");
+            if (!silent) alert("Selecteaza lab, activitate si luna.");
             return;
         }
 
@@ -234,7 +141,7 @@ const Form = {
 
         const res = await fetch(url, { credentials: "same-origin" });
         if (!res.ok) {
-            if (!silent) alert("Eroare la încărcarea câmpurilor lunare.");
+            if (!silent) alert("Eroare la incarcarea campurilor lunare.");
             return;
         }
 
@@ -251,7 +158,7 @@ const Form = {
     async saveMonthlyMeta({ silent = false } = {}) {
         const ctx = this.getMonthlyContext();
         if (!ctx.labId || !ctx.activitateId || !ctx.month || !ctx.year) {
-            if (!silent) alert("Selectează lab, activitate și luna.");
+            if (!silent) alert("Selecteaza lab, activitate si luna.");
             return;
         }
 
@@ -276,12 +183,11 @@ const Form = {
         });
 
         if (!res.ok) {
-            let msg = "Eroare la salvarea câmpurilor lunare.";
+            let msg = "Eroare la salvarea campurilor lunare.";
             try {
                 const data = await res.json();
                 if (data?.error) msg = data.error;
             } catch {
-                // ignore
             }
             if (!silent) alert(msg);
             return;
@@ -290,18 +196,69 @@ const Form = {
         if (!silent) alert("Salvat lunar.");
     },
 
+    applyPermissions(user) {
+        this.canEditMonthly = !!user?.username;
+    },
+
+    async uploadSignature() {
+        const labId = window.currentLabId || document.getElementById("lab")?.value;
+        if (!labId) {
+            alert("Selecteaza un lab.");
+            return;
+        }
+
+        const labName = Labs.labMap?.[labId];
+        if (labName !== "Lab2") {
+            alert("Semnatura PNG este disponibila doar pentru Lab2.");
+            return;
+        }
+
+        const file = this.signatureFileInput?.files?.[0];
+        if (!file) {
+            alert("Selecteaza un fisier PNG.");
+            return;
+        }
+        if (file.type !== "image/png" && !file.name.toLowerCase().endsWith(".png")) {
+            alert("Doar fisiere PNG sunt permise.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("signature", file);
+
+        const res = await fetch(`/api/labs/${encodeURIComponent(labId)}/signature/`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "X-CSRFToken": Auth.getCSRFToken()
+            },
+            body: formData
+        });
+
+        if (!res.ok) {
+            let msg = "Eroare la upload semnatura.";
+            try {
+                const data = await res.json();
+                if (data?.error) msg = data.error;
+            } catch {
+            }
+            alert(msg);
+            return;
+        }
+
+        alert("Semnatura a fost salvata.");
+    },
+
     async submit(e) {
         e.preventDefault();
 
-        const formattedDate = this.convertToBackendDate(
-            document.getElementById("date").value
-        );
+        const formattedDate = this.convertToBackendDate(document.getElementById("date").value);
         if (formattedDate) {
             const [yy, mm, dd] = formattedDate.split("-").map(n => parseInt(n, 10));
             const dateObj = new Date(yy, (mm || 1) - 1, dd || 1);
-            const dow = dateObj.getDay(); // 0=Sun .. 6=Sat
+            const dow = dateObj.getDay();
             if (dow === 0 || dow === 6) {
-                alert("Ați încercat să pontați in weekend");
+                alert("Ati incercat sa pontati in weekend");
                 return;
             }
         }
@@ -309,13 +266,9 @@ const Form = {
         const startTime = this.startTimeInput?.value || "";
         const nrOre = parseInt(this.nrOreInput?.value || "", 10);
         if (!Number.isFinite(nrOre) || nrOre < 1 || nrOre > 12) {
-            alert("Nr. ore trebuie să fie între 1 și 12.");
+            alert("Nr. ore trebuie sa fie intre 1 si 12.");
             return;
         }
-
-        const selectedMembers = [
-            ...document.querySelectorAll("#members input:checked")
-        ].map(cb => cb.value);
 
         const endTime = this.addHoursToTime(startTime, nrOre);
         const durata = `${startTime}-${endTime}`;
@@ -325,8 +278,6 @@ const Form = {
             lab: document.getElementById("lab").value,
             activitate: document.getElementById("activitate").value,
             livrabil: document.getElementById("livrabil").value,
-            individual: document.getElementById("individual").value,
-            members: selectedMembers,
             date: formattedDate,
             durata: durata,
             nr_ore: nrOre,
@@ -340,16 +291,6 @@ const Form = {
             data.links = "";
         }
 
-        const jurnalEl = document.getElementById("jurnal");
-        if (jurnalEl) {
-            data.jurnal = jurnalEl.value;
-        }
-
-        const scurtaEl = document.getElementById("scurta_descriere_jurnal");
-        if (scurtaEl) {
-            data.scurta_descriere_jurnal = scurtaEl.value;
-        }
-
         const response = await fetch("/api/work-entry/", {
             method: "POST",
             credentials: "same-origin",
@@ -361,21 +302,17 @@ const Form = {
         });
 
         if (response.ok) {
-            const lab = document.getElementById("lab").value;  // capture BEFORE reset
+            const lab = document.getElementById("lab").value;
             alert("Saved successfully!");
             this.form.reset();
-
             if (lab) Calendar.loadCalendarForLab(lab);
-        }else {
+        } else {
             let message = "Error saving entry.";
-
             try {
-                const data = await response.json();
-                if (data.error) message = data.error;
-            } catch (e) {
-                // response wasn't JSON
+                const dataResp = await response.json();
+                if (dataResp.error) message = dataResp.error;
+            } catch {
             }
-
             alert(message);
         }
     }

@@ -12,6 +12,7 @@ from io import BytesIO
 from collections import defaultdict
 from openpyxl.comments import Comment
 from openpyxl.utils import range_boundaries
+from openpyxl.drawing.image import Image as XLImage
 
 def is_merged_cell(ws, row, col):
     for merged_range in ws.merged_cells.ranges:
@@ -140,118 +141,6 @@ def autofit_sheet(ws):
         ws.row_dimensions[row_cells[0].row].height = min(220, max_lines * 16)
 
 
-LAB_JURNAL_NAMES = ["Lab1", "Lab2"]
-
-def should_show_jurnal_field(profile):
-    if not profile:
-        return False
-
-    return LabMembership.objects.filter(
-        profile=profile,
-        lab__name__in=LAB_JURNAL_NAMES
-    ).exists()
-
-
-def AG_workbook(lab, users, month, year, show_jurnal=False):
-    users = sorted(list(users), key=lambda u: u.last_name)
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Pontaj"
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-    header_fill = PatternFill(start_color="ab9896", end_color="ab9896", fill_type="solid")
-
-    # ws.append([
-    #     "User","Lab","Subactivitate","Livrabil","Individual","Members",
-    #     "Data","Nr ore","Durata","Descriere activitate","Comentarii","Links"
-    #     ])
-    fixed_header = [
-        "Data",
-        "Nr ore",
-        "Durata",
-        "User",
-        "Lab",
-        "Activitate",
-        "Descriere",
-        "Individual",
-        "Livrabil",
-    ]
-    if show_jurnal:
-        fixed_header.append("Jurnal")
-    fixed_header.append("Links")
-
-    header = list(fixed_header)
-
-    header += [get_initials(u) for u in users]
-
-    header += [
-    "Comentarii",
-    "Validat L2",
-    "Validat Aumovio",
-    "Validat P. Demian"
-    ]
-
-    ws.append(header)
-    for col_idx in range(1, len(header) + 1):
-        ws.cell(row=1, column=col_idx).fill = header_fill
-    
-    base_columns = len(fixed_header)
-    for idx, user in enumerate(users):
-        col_idx = base_columns + 1 + idx
-        full_name = f"{user.first_name} {user.last_name}"
-        ws.cell(row=1, column=col_idx).comment = Comment(full_name, "")
-
-    entries = (
-        WorkEntry.objects.select_related("user", "lab", "activitate")
-        .filter(
-            lab=lab,
-            user__in=users,
-            date__year=year,
-            date__month=month,
-        )
-        .order_by("date", "id")
-    )
-
-    for e in entries:
-        member_ids = set(e.members.values_list("id", flat=True))
-        nume_utilizator = e.user.first_name+" "+e.user.last_name
-        if e.user:
-            member_ids.add(e.user.id)
-        member_columns = [
-            "✓" if u.id in member_ids else ""
-            for u in users
-        ]
-        row = [
-            e.date.strftime("%d-%m-%Y"),
-            e.nr_ore,
-            e.durata,
-            nume_utilizator if e.user else "Anonymous",
-            e.lab.name,
-            e.activitate.nume,
-            e.activity_description,
-            "Da" if e.individual else "Nu",
-            e.livrabil or "",
-        ]
-        if show_jurnal:
-            row.append(getattr(e, "jurnal", "") or "")
-        row.append(e.links)
-        row += member_columns
-        row += [
-            e.comentarii,
-        ]
-        ws.append(row)
-
-    autofit_sheet(ws)
-
-    for row in ws.iter_rows():
-        for cell in row:
-            cell.border = thin_border
-    return wb
-
 def upt_workbook(lab, users, month, year, director):
     days_in_month = calendar.monthrange(year, month)[1]
     month_name = months_to_RO(month)
@@ -337,6 +226,24 @@ def upt_workbook(lab, users, month, year, director):
 
         ws.merge_cells(start_row=row+2, start_column=days_in_month+2, end_row=row+5, end_column=days_in_month+2)
 
+        membership = LabMembership.objects.filter(lab=lab, profile__user=user).first()
+        if membership and membership.signature_png:
+            try:
+                img_stream = BytesIO(membership.signature_png)
+                img = XLImage(img_stream)
+
+                max_width = 160
+                max_height = 100
+                scale = min(max_width / float(img.width or 1), max_height / float(img.height or 1), 1.0)
+                img.width = int((img.width or 1) * scale)
+                img.height = int((img.height or 1) * scale)
+
+                anchor_col_letter = ws.cell(row=1, column=days_in_month + 2).column_letter
+                img.anchor = f"{anchor_col_letter}{row+2}"
+                ws.add_image(img)
+            except Exception:
+                ws.cell(row=row+2, column=days_in_month + 2, value="Semnatura PNG invalida")
+
         # FETCH ENTRIES
         entries = WorkEntry.objects.filter(
             user=user,
@@ -395,337 +302,24 @@ def upt_workbook(lab, users, month, year, director):
 
         ws.cell(row=final_row, column=last_col-2, value="Întocmit,")
         ws.cell(row=final_row+1, column=last_col-2, value=f"{user.last_name} {user.first_name}")
+        if membership and membership.signature_png:
+            try:
+                img_stream = BytesIO(membership.signature_png)
+                img = XLImage(img_stream)
+
+                max_width = 160
+                max_height = 100
+                scale = min(max_width / float(img.width or 1), max_height / float(img.height or 1), 1.0)
+                img.width = int((img.width or 1) * scale)
+                img.height = int((img.height or 1) * scale)
+
+                anchor_col_letter = ws.cell(row=1, column=last_col-2).column_letter
+                img.anchor = f"{anchor_col_letter}{final_row+2}"
+                ws.add_image(img)
+            except Exception:
+                ws.cell(row=final_row+2, column=last_col-2, value="Semnatura PNG invalida")
 
     return wb
-
-def mipe_workbook(lab, users, month, year):
-    days_in_month = calendar.monthrange(year, month)[1]
-    month_name = months_to_RO(month)
-
-    wb = Workbook()
-    wb.remove(wb.active)  # Remove default sheet
-
-    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    bold = Font(bold=True)
-    center_wrapped = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
-    # Create a sheet for each user
-    for user in users:
-        ws = wb.create_sheet(title=f"{user.first_name}{user.last_name}")
-        
-        # Pre-fetch membership for the current lab to fill header info (Job title etc.)
-        membership_by_user_id = {
-            m.profile.user_id: m
-            for m in LabMembership.objects.filter(lab=lab, profile__user__in=users).select_related(
-                "profile__user"
-            )
-        }
-
-        # Find all labs (contracts) for this user to create columns
-        user_memberships = LabMembership.objects.filter(profile__user=user).select_related('lab').order_by('lab__id')
-        user_labs = [m.lab for m in user_memberships]
-        
-        # Fallback if user has no labs (should not happen if they are in the list)
-        if not user_labs:
-            user_labs = [lab]
-            
-        nr_labs = len(user_labs)
-        lab_index = {l.id: i for i, l in enumerate(user_labs)}
-
-        # HEADER
-        ws["B2"] = "Anexa 1"
-        ws["B3"] = "Fișă individuala pontaj si de alocare a timpului de lucru"
-        ws["B4"] = f"Luna {month_name} Anul {year}"
-        for r in (2,3,4):
-            ws.merge_cells(start_row=r,start_column=2,end_row=r,end_column=8)
-
-        ws["B6"] = "Numele şi prenumele persoană"
-        ws["B7"] = "CNP"
-        ws["B8"] = "Funcția în Proiect¹"
-        membership = membership_by_user_id.get(user.id)
-        ws["F8"] = (membership.post or "") if membership else ""
-        ws["B9"] = "Corespondenta cu HG Nr. 1188/2022 (50/35/25/15 euro)/Corespodența cu plafonul" \
-                    " prevăzut în Ghidul Solicitantului/corespondenta cu Legea 153/2017"
-        ws["B10"] = "Echivalent în lei a Limitei maxime în  euro/oră se calculează la cursul de " \
-                    "schimb valutar comunicat de BNR pentru 1 euro la data semnării contractului de finanțare"
-        ws["B11"] = "Denumire Lider/Partener"
-        for r in range(6,12):
-            ws.merge_cells(start_row=r,start_column=2,end_row=r,end_column=5)
-            ws.cell(row=r, column=2).alignment = center
-
-        # Add user information in F-I columns
-        ws.merge_cells(start_row=6, start_column=6, end_row=6, end_column=9)
-        ws.cell(row=6, column=6, value=f"{user.first_name} {user.last_name}")
-        ws.cell(row=6, column=6).alignment = center
-        ws.cell(row=6, column=6).font = bold
-
-        ws.merge_cells(start_row=7, start_column=6, end_row=7, end_column=9)
-        ws.cell(row=7, column=6, value=getattr(user, 'cnp', ''))
-        ws.cell(row=7, column=6).alignment = center_wrapped
-        ws.cell(row=7, column=6).font = bold
-
-        for q in range(8,12):
-            ws.merge_cells(start_row=q, start_column=6, end_row=q, end_column=9)
-            ws.cell(row=8, column=6).alignment = center_wrapped
-
-
-        # Row 12 - Contract headers
-        ws.merge_cells(start_row=12, start_column=2, end_row=13, end_column=2)
-        ws.cell(row=12, column=2, value="Ziua")
-        ws.cell(row=12, column=2).alignment = center_wrapped
-        ws.cell(row=12, column=2).font = bold
-
-
-        for i in range(nr_labs):
-            start_col = 3 + (i * 2)
-            end_col = start_col + 1
-            ws.merge_cells(start_row=12, start_column=start_col, end_row=12, end_column=end_col)
-            ws.cell(row=12, column=start_col, value=f"Contract Individual de Muncă/Act administrativ de numire. {i+1} ²")
-            ws.cell(row=12, column=start_col).alignment = center_wrapped
-
-        total_col = 3 + (nr_labs * 2)
-        ws.merge_cells(start_row=12, start_column=total_col, end_row=13, end_column=total_col)
-        ws.cell(row=12, column=total_col, value="Total ore lucrate/zi")
-        ws.cell(row=12, column=total_col).alignment = center_wrapped
-        ws.cell(row=12, column=total_col).font = bold
-
-        # Row 13 - Contract details
-        for i in range(nr_labs):
-            col1 = 3 + (i * 2)
-            col2 = col1 + 1
-            ws.cell(row=13, column=col1, value="nr ore lucrate")
-            ws.cell(row=13, column=col1).alignment = center
-            ws.cell(row=13, column=col1).font = bold
-            ws.cell(row=13, column=col2, value="interval orar")
-            ws.cell(row=13, column=col2).alignment = center
-            ws.cell(row=13, column=col2).font = bold
-
-        row = 14
-        col = 1
-
-        # FETCH ENTRIES
-        entries = WorkEntry.objects.filter(
-            user=user,
-            lab__in=user_labs,
-            date__year=year,
-            date__month=month
-        )
-
-        hours = defaultdict(float)
-        durata = defaultdict(list)
-
-        for e in entries:
-            key = (e.lab_id, e.date.day)
-            hours[key] += e.nr_ore
-            durata[key].append(str(e.durata))
-
-        total_month = 0
-        totals_lab = {l.id: 0 for l in user_labs}
-
-        # DAYS HEADER
-        for d in range(1, days_in_month + 1):
-            ws.cell(row,2,d).alignment=center
-
-            total_day = 0
-
-            for lab_obj in user_labs:
-                l_id = lab_obj.id
-                i = lab_index[l_id]
-
-                col = 3+i*2
-
-                h = hours.get((l_id, d), "")
-                dur_list = durata.get((l_id, d), [])
-                dur_list.sort(key=lambda x: int(x.split('-')[0].replace(':', '')) if '-' in x and ':' in x.split('-')[0] else 0)
-                dur_str = "\n".join(dur_list)
-
-                ws.cell(row,col,h).alignment=center
-                ws.cell(row,col+1,dur_str).alignment=center
-
-                if isinstance(h,(int,float)):
-                    total_day += h
-                    totals_lab[l_id] += h
-
-            ws.cell(row,total_col,total_day)
-
-            total_month += total_day
-            row=row+1
-
-        end = row
-        ws.cell(end,2,"Nr. total de ore").font=bold
-
-        for lab_obj in user_labs:
-            i = lab_index[lab_obj.id]
-            col = 3+i*2
-            ws.cell(end, col, totals_lab[lab_obj.id])
-
-        for j in range(1,9):
-            ws.merge_cells(start_row=end+j, start_column=2, end_row=end+j, end_column=total_col)
-            ws.cell(row=end+j, column=total_col).alignment = center_wrapped
-        ws.cell(row=end+1, column=2, value="Subsemnatul/a declar, sub sancțiunea Codului penal, art. 326, privind falsul în declaraţii că \n" \
-        "informațiile furnizate sunt adevărate și corecte în fiecare detaliu și înțeleg că AM/OI are dreptul să-mi solicite documente\n" \
-        " doveditoare în scopul verificării și confirmării acestora")
-        ws.cell(row=end+2,column=2, value=f"Nume și prenumele persoană: {user.first_name+" "+user.last_name}")
-        ws.cell(row=end+3,column=2, value="Data:")
-        ws.cell(row=end+5,column=2, value="Luat la cunoștință de către Responsabil Lider/Partener:")
-        ws.cell(row=end+6,column=2, value="Semnătură:")
-        ws.cell(row=end+7,column=2, value="Data:")
-
-        
-        for r in range(6, end+8):
-            for c in range(2, total_col+1):
-                ws.cell(row=r, column=c).border = thin_border
-
-        # auto‑size columns and rows for this sheet
-        autofit_sheet(ws)
-
-    return wb
-
-
-def build_sumary_sheet(wb, users, year, month, lab):
-
-    ws = wb.create_sheet("Sumary")
-    month_name = calendar.month_name[month].lower()
-    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    bold = Font(bold=True)
-
-    thin = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
-    # ---------------- HEADER ----------------
-    ws["A2"] = "Indirect partner name:"
-    ws["A3"] = "Project name:"
-    ws["A4"] = "Contract PI/C9/I4 nr:"
-
-    for r in (2,3,4):
-        ws.merge_cells(start_row=r,start_column=1,end_row=r,end_column=3)
-
-    ws["A5"] = f"PONTAJ INDIVIDUAL PENTRU LUNA {month_name}"
-    ws.merge_cells("A5:E5")
-    ws["G5"] = f"ANUL {year}"
-
-    ws["A7"] = f"PONTAJ CENTRALIZAT PENTRU LUNA: {month} ANUL {year}"
-    ws.merge_cells("A7:E7")
-
-    header_row = 9
-
-    # ---------------- HEADER ----------------
-
-    ws.merge_cells(start_row=header_row, start_column=1, end_row=header_row+1, end_column=1)
-    ws.cell(header_row,1,"NR. CRT.").alignment = center
-    ws.cell(header_row,1).font = bold
-
-    ws.merge_cells(start_row=header_row, start_column=2, end_row=header_row+1, end_column=2)
-    ws.cell(header_row,2,"PERSONAL ANGAJAT").alignment = center
-    ws.cell(header_row,2).font = bold
-
-    ws.merge_cells(start_row=header_row, start_column=3, end_row=header_row, end_column=6)
-    ws.cell(header_row,3,"NUMAR ORE PE ACTIVITATI").alignment = center
-    ws.cell(header_row,3).font = bold
-
-    ws.cell(header_row+1,3,"A1")
-    ws.cell(header_row+1,4,"A2")
-    ws.cell(header_row+1,5,"A3")
-    ws.cell(header_row+1,6,"A4")
-
-    for c in range(3,7):
-        ws.cell(header_row+1,c).alignment = center
-        ws.cell(header_row+1,c).font = bold
-
-    ws.merge_cells(start_row=header_row, start_column=7, end_row=header_row+1, end_column=7)
-    ws.cell(header_row,7,"TOTAL").alignment = center
-    ws.cell(header_row,7).font = bold
-
-    # ---------------- FETCH ENTRIES ----------------
-
-    entries = WorkEntry.objects.filter(
-        user__in=users,
-        date__year=year,
-        date__month=month
-    ).select_related("user","lab")
-
-    # hours[(user_id, lab_id, day)] = hours
-    hours = defaultdict(int)
-
-    for e in entries:
-        hours[(e.user_id, e.activitate_id)] += e.nr_ore
-
-    # determine labs automatically
-    activitati = list(lab.activitati.all().order_by('id')[:4])
-    activitate_index = {act.id: i for i, act in enumerate(activitati)}
-
-    # ---------------- TABLE BODY ----------------
-
-    start_row = header_row + 2
-    row = start_row
-
-    total_activitate = defaultdict(int)
-
-    for i, user in enumerate(users, start=1):
-
-        ws.cell(row,1,i).alignment = center
-        ws.cell(row,2,f"{user.last_name} {user.first_name}")
-
-        total_zi = 0
-
-        for act_id, i_lab in activitate_index.items():
-            col = 3 + i_lab
-
-            h = hours.get((user.id, act_id), 0)
-
-            ws.cell(row,col,h)
-
-            total_zi += h
-            total_activitate[act_id] += h
-
-        ws.cell(row,7,total_zi).alignment = center
-
-        row += 1
-
-    # ---------------- MONTH TOTALS ----------------
-
-    ws.cell(row,1,"TOTAL").font = bold
-    grand_total = 0
-
-    for act_id, i in activitate_index.items():
-
-        col = 3 + i
-        val = total_activitate[act_id]
-
-        ws.cell(row,col,val).font = bold
-        ws.cell(row,col).alignment = center
-
-        grand_total += val
-
-    ws.cell(row,7,grand_total).font = bold
-    ws.cell(row,7).alignment = center
-
-    # ---------------- BORDERS ----------------
-
-    for r in range(header_row, row+1):
-        for c in range(1,8):
-            ws.cell(r,c).border = thin
-
-    ws.cell(row+4,2,"Aprobat,")
-    ws.cell(row+5,2,"Director de proiect,")
-    ws.merge_cells(start_row=row+4,start_column=2,end_row=row+4,end_column=3)
-    ws.cell(row+4,4,"Avizat,")
-    ws.cell(row+5,4,"Coordonator achizitii si resursa umana,")
-    ws.merge_cells(start_row=row+5,start_column=4,end_row=row+5,end_column=7)
-
-    # auto‑size sheet
-    autofit_sheet(ws)
 
 
 def normalize_url(value):
@@ -907,6 +501,7 @@ def conti_workbook(lab, users, month, year, director):
             ws.cell(row=r, column=1).alignment = center_wrapped
             if ws.cell(row=r, column=2).value is None:
                 ws.cell(row=r, column=2, value = "NU ESTE CAZUL").alignment = center_wrapped
+                ws.cell(row=r, column=2, value = "NU ESTE CAZUL").font = color
 
 
 
@@ -959,7 +554,9 @@ def conti_workbook(lab, users, month, year, director):
         for d in range(1,days+1):
 
             row = r0+2+d
-            ws.cell(row,1,d).alignment=center
+            ws.cell(row,1,f"{d} {month_name}").alignment=center
+            ws.cell(row,1,f"{d} {month_name}").font=bold
+
 
             total_day = 0
 
@@ -979,19 +576,27 @@ def conti_workbook(lab, users, month, year, director):
                     totals_activitate[act_id] += h
 
             ws.cell(row,nr_Activitati*2+2,total_day)
+            ws.cell(row,nr_Activitati*2+2).alignment=center
+            ws.cell(row,nr_Activitati*2+2).font=bold
+
 
             total_month += total_day
 
         # totals per lab
         end = r0+2+days+1
-        ws.cell(end,1,"TOTAL Lab").font=bold
+        ws.cell(end,1,"TOTAL").font=bold
+        ws.cell(end,1,"TOTAL").alignment=center
 
         for act_id, i in activitate_index.items():
             col = 2+i*2
             ws.cell(end, col, totals_activitate[act_id])
-            
+            ws.cell(end, col).font=bold
+            ws.cell(end, col).alignment=center
+
 
         ws.cell(end,nr_Activitati*2+2,total_month).font=bold
+        ws.cell(end,nr_Activitati*2+2).alignment=center
+
 
         # borders
         apply_border(ws, r0, 1, end, nr_Activitati*2+2, thickness="thin")
@@ -1000,15 +605,15 @@ def conti_workbook(lab, users, month, year, director):
         ws.cell(end+6,2,f"Responsabil laborator in cercetare-proiectare\n"
                         f"pentru activitatea {lab.name[-1]},")
         ws.merge_cells(start_row=end+6,start_column=2,end_row=end+6,end_column=3)
-        ws.cell(end+7,2,f"{director.last_name.upper()} {director.first_name}")
+        ws.cell(end+7,2,f"{director.first_name} {director.last_name.upper()} ")
         ws.cell(end+8,2,f"Semnătura")
 
         ws.cell(end+5,8,"Aprobat,")
         ws.cell(end+6,8,f"Responsabil AUMOVIO pentru activitatea {lab.name[-1]},")
-        ws.cell(end+7,8,f"----Nume angajat conti----")
+        ws.cell(end+7,8,(lab.responsabil_aumovio or "").strip())
         ws.merge_cells(start_row=end+6,start_column=8,end_row=end+6,end_column=9)
         ws.cell(end+8,8,f"Semnătura")
-        for r in range(1, end+9):
+        for r in range(1, end+11):
             for c in range(1,nr_Activitati*2+4):
                 if is_merged_cell(ws, r, c):
                     continue
@@ -1019,10 +624,7 @@ def conti_workbook(lab, users, month, year, director):
 
         user_workbooks.append((user, wb))
 
-    sumary_wb = Workbook()
-    sumary_wb.remove(sumary_wb.active)
-    build_sumary_sheet(sumary_wb, users, year, month, lab)
-    return user_workbooks, sumary_wb
+    return user_workbooks
 
 @require_http_methods(["GET"])
 def export_excel(request):
@@ -1063,29 +665,21 @@ def export_excel(request):
         else request.user
     )
 
-    show_jurnal = should_show_jurnal_field(profile)
-    include_ag = show_jurnal and lab.name in LAB_JURNAL_NAMES
-
-    wb_AG = AG_workbook(lab, users, month, year, show_jurnal=show_jurnal) if include_ag else None
     wb_upt = upt_workbook(lab,users,month,year,director_user)
-    conti_user_workbooks, conti_sumary_wb = conti_workbook(lab, users, month, year, director_user)
-    wb_mipe = mipe_workbook(lab, users, month, year)
+    conti_user_workbooks= conti_workbook(lab, users, month, year, director_user)
 
-    AG_buffer = BytesIO() if wb_AG is not None else None
     upt_buffer = BytesIO()
-    mipe_buffer = BytesIO()
 
-    if wb_AG is not None and AG_buffer is not None:
-        wb_AG.save(AG_buffer)
     wb_upt.save(upt_buffer)
-    wb_mipe.save(mipe_buffer)
 
     zip_buffer = BytesIO()
 
     with zipfile.ZipFile(zip_buffer,"w") as z:
-        if AG_buffer is not None:
-            z.writestr("pontaj_tabel_AG.xlsx", AG_buffer.getvalue())
-        z.writestr(f"pontaj_poli_{lab.name}_{month}_{year}.xlsx",upt_buffer.getvalue())
+        export_user = request.user
+        z.writestr(
+            f"L{lab.name[-1]} Pontaj {month} {year} {export_user.last_name.upper()} {export_user.first_name}.xlsx",
+            upt_buffer.getvalue(),
+        )
         for user, wb in conti_user_workbooks:
             user_buffer = BytesIO()
             wb.save(user_buffer)
@@ -1093,7 +687,6 @@ def export_excel(request):
                 f"L{lab.name[-1]}_Pontaj_{month}_{months_to_RO(month)}_{user.last_name.upper()}_{user.first_name}.xlsx",
                 user_buffer.getvalue(),
             )
-        z.writestr(f"pontaj_MIPE_{lab.name}_{month}_{year}.xlsx",mipe_buffer.getvalue())
 
     zip_buffer.seek(0)
 
