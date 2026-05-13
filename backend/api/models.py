@@ -8,7 +8,7 @@ from django.dispatch import receiver
 class Lab(models.Model):
     name = models.CharField(max_length=100, unique=True)
     titlu = models.CharField(max_length=255, blank=True, default="")
-    responsabil_aumovio = models.CharField(max_length=255, blank=True, default="")
+    responsabil_aumovio = models.CharField(max_length=255, blank=True, null=True)
     
     def __str__(self):
         return self.name
@@ -21,7 +21,7 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="member")
-    user_id_code = models.CharField(max_length=255, blank=True, default="")
+    user_id_code = models.CharField(max_length=255, blank=True, null=True)
     monthly_hour_limit = models.IntegerField(default=40)
     labs = models.ManyToManyField("Lab", through="LabMembership", blank=True)
 
@@ -50,8 +50,7 @@ class LabMembership(models.Model):
     
 @receiver(post_save, sender=User)
 def create_profile(sender, instance, created, **kwargs):
-    if created:
-        UserProfile.objects.create(user=instance)
+        UserProfile.objects.get_or_create(user=instance)
 
     
 class Activitate(models.Model):
