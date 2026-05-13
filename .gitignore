@@ -28,3 +28,4 @@ docker-compose.prod.yml
 Dockerfile
 pontaj_v2-web.tar
 entrypoint.prod.sh
+db.sqlite3
