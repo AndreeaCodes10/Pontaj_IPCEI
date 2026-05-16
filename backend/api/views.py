@@ -782,18 +782,13 @@ def work_entry_detail(request, entry_id):
             return None
         a, b = s.split("-", 1)
         try:
-            sh, sm = [int(x) for x in a.strip().split(":", 1)]
-            eh, em = [int(x) for x in b.strip().split(":", 1)]
+            sh = int(a.strip())
+            eh = int(b.strip())
         except Exception:
             return None
-        start = sh * 60 + sm
-        end = eh * 60 + em
-        if end <= start:
+        if sh < 0 or sh > 23 or eh < 1 or eh > 24 or eh <= sh:
             return None
-        diff = end - start
-        if diff % 60 != 0:
-            return None
-        return diff // 60
+        return eh - sh
 
     new_date = entry.date
     if "date" in updates:

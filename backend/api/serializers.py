@@ -45,11 +45,15 @@ class WorkEntrySerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        # ensure durata format HH:MM-HH:MM
-        if "-" not in data["durata"]:
-            raise serializers.ValidationError(
-                "Durata format invalid."
-            )
+        # ensure durata format HH-HH
+        durata = str(data.get("durata") or "").strip()
+        parts = durata.split("-", 1)
+        if len(parts) != 2 or not all(part.strip().isdigit() for part in parts):
+            raise serializers.ValidationError("Durata format invalid. Foloseste HH-HH.")
+
+        sh, eh = [int(x.strip()) for x in parts]
+        if sh < 0 or sh > 23 or eh < 1 or eh > 24 or eh <= sh:
+            raise serializers.ValidationError("Durata format invalid. Foloseste HH-HH.")
 
         if data["activitate"].lab != data["lab"]:
             raise serializers.ValidationError(

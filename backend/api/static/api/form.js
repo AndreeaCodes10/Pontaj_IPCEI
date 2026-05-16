@@ -100,7 +100,7 @@ const Form = {
         }
 
         const endTime = this.addHoursToTime(startTime, nrOre);
-        this.durataInput.value = `${startTime}-${endTime}`;
+        this.durataInput.value = `${startTime.slice(0,2)}-${endTime.slice(0,2)}`;
     },
 
     getMonthYearFromMonthInput() {
@@ -271,7 +271,7 @@ const Form = {
         }
 
         const endTime = this.addHoursToTime(startTime, nrOre);
-        const durata = `${startTime}-${endTime}`;
+        const durata = `${startTime.slice(0,2)}-${endTime.slice(0,2)}`;
         if (this.durataInput) this.durataInput.value = durata;
 
         const data = {

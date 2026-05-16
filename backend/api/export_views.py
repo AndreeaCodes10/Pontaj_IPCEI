@@ -201,8 +201,13 @@ def upt_workbook(lab, users, month, year, director):
         ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=last_col-1)
 
         ws.cell(row=row+2, column=1, value=f"{user.last_name.upper()} {user.first_name}").font = bold
-        ws.merge_cells(start_row=row+2, start_column=1, end_row=row+5, end_column=1)
+        ws.merge_cells(start_row=row+2, start_column=1, end_row=row+4, end_column=1)
         ws.cell(row=row+2, column=1).alignment = center_wrapped
+
+        membership = LabMembership.objects.filter(lab=lab, profile__user=user).first()
+        code = str(membership.user_id_code or "").strip() if membership else ""
+        ws.cell(row=row+5, column=1, value=(f"CIM {code}" if code else ""))
+        ws.cell(row=row+5, column=1).alignment = center_wrapped
 
         ws.cell(row=row+6, column=1, value="Total ore lucrate:").font = bold
         ws.cell(row=row+6, column=1).alignment = center_wrapped
@@ -226,7 +231,6 @@ def upt_workbook(lab, users, month, year, director):
 
         ws.merge_cells(start_row=row+2, start_column=days_in_month+2, end_row=row+5, end_column=days_in_month+2)
 
-        membership = LabMembership.objects.filter(lab=lab, profile__user=user).first()
         if membership and membership.signature_png:
             try:
                 img_stream = BytesIO(membership.signature_png)
@@ -275,7 +279,7 @@ def upt_workbook(lab, users, month, year, director):
                 dur_list = durata.get((act_id, d), [])
                 intervaluri_durata.extend(dur_list)
 
-            intervaluri_durata.sort(key=lambda x: int(x.split('-')[0].replace(':', '')) if '-' in x and ':' in x.split('-')[0] else 0)
+            intervaluri_durata.sort(key=lambda x: int(x.split('-')[0].strip()) if '-' in x and x.split('-')[0].strip().isdigit() else 0)
 
             for idx, dur_val in enumerate(intervaluri_durata):
                 row_offset = min(idx, 3)  # Use max 4 rows (offsets 0-3)
@@ -607,6 +611,27 @@ def conti_workbook(lab, users, month, year, director):
         ws.merge_cells(start_row=end+6,start_column=2,end_row=end+6,end_column=3)
         ws.cell(end+7,2,f"{director.first_name} {director.last_name.upper()} ")
         ws.cell(end+8,2,f"Semnătura")
+        # Add signature only when the exporter (sheet owner) is Lab2's director.
+        if (
+            lab.name == "Lab2"
+            and membership
+            and membership.role == "director"
+            and membership.signature_png
+        ):
+            try:
+                img_stream = BytesIO(membership.signature_png)
+                img = XLImage(img_stream)
+
+                max_width = 180
+                max_height = 90
+                scale = min(max_width / float(img.width or 1), max_height / float(img.height or 1), 1.0)
+                img.width = int((img.width or 1) * scale)
+                img.height = int((img.height or 1) * scale)
+
+                img.anchor = f"B{end+9}"
+                ws.add_image(img)
+            except Exception:
+                ws.cell(end+9, 2, "Semnatura PNG invalida")
 
         ws.cell(end+5,8,"Aprobat,")
         ws.cell(end+6,8,f"Responsabil AUMOVIO pentru activitatea {lab.name[-1]},")

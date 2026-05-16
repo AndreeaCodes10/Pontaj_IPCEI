@@ -21,7 +21,6 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="member")
-    user_id_code = models.CharField(max_length=255, blank=True, null=True)
     monthly_hour_limit = models.IntegerField(default=40)
     labs = models.ManyToManyField("Lab", through="LabMembership", blank=True)
 
@@ -41,6 +40,7 @@ class LabMembership(models.Model):
     monthly_hour_limit = models.IntegerField(default=40)
     post = models.CharField(max_length=255, blank=True, default="")
     signature_png = models.BinaryField(blank=True, null=True)
+    user_id_code = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         unique_together = ("profile", "lab")

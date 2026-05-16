@@ -139,14 +139,12 @@ const Entries = {
             const s = String(durata || "").trim();
             if (!s.includes("-")) return null;
             const [a, b] = s.split("-", 2).map(x => x.trim());
-            const pa = a.split(":").map(Number);
-            const pb = b.split(":").map(Number);
-            if (pa.length !== 2 || pb.length !== 2) return null;
-            const start = pa[0] * 60 + pa[1];
-            const end = pb[0] * 60 + pb[1];
+            const start = Number(a);
+            const end = Number(b);
+            if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
             const diff = end - start;
-            if (diff <= 0 || diff % 60 !== 0) return null;
-            return diff / 60;
+            if (start < 0 || start > 23 || end < 1 || end > 24 || diff <= 0) return null;
+            return diff;
         };
 
         const setEditing = (row, enabled) => {
@@ -201,7 +199,7 @@ const Entries = {
 
                 const durH = durationHours(durata);
                 if (durH === null) {
-                    alert("Durata format invalid (HH:MM-HH:MM).");
+                    alert("Durata format invalid (HH-HH).");
                     return;
                 }
                 if (durH !== nrOre) {

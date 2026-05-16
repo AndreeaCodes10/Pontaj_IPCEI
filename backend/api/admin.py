@@ -11,16 +11,16 @@ class LabMembershipInline(admin.TabularInline):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "role", "user_id_code", "monthly_hour_limit")
+    list_display = ("user", "role", "monthly_hour_limit")
     list_filter = ("role",)
-    search_fields = ("user__username", "user_id_code")
+    search_fields = ("user__username",)
     inlines = [LabMembershipInline]
 
 @admin.register(LabMembership)
 class LabMembershipAdmin(admin.ModelAdmin):
-    list_display = ("profile", "lab", "role", "monthly_hour_limit", "post")
+    list_display = ("profile", "lab", "role", "user_id_code", "monthly_hour_limit", "post")
     list_filter = ("lab", "role")
-    search_fields = ("profile__user__username", "lab__name")
+    search_fields = ("profile__user__username", "lab__name", "user_id_code")
     
 @admin.register(Lab)
 class LabAdmin(admin.ModelAdmin):
